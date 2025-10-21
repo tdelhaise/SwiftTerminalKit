@@ -11,24 +11,9 @@ let package = Package(
         .executable(name: "BasicDemo", targets: ["BasicDemo"]),
     ],
     targets: [
-        .target(
-            name: "CShims",
-            path: "CShims",
-            publicHeadersPath: "."
-        ),
-        .target(
-            name: "SwiftTerminalKit",
-            dependencies: ["CShims"],
-            path: "Sources/SwiftTerminalKit"
-        ),
-        .executableTarget(
-            name: "BasicDemo",
-            dependencies: ["SwiftTerminalKit"],
-            path: "Examples/BasicDemo"
-        ),
-        .testTarget(
-            name: "SwiftTerminalKitTests",
-            dependencies: ["SwiftTerminalKit"]
-        )
+        .target(name: "CShims", path: "CShims", publicHeadersPath: "."),
+        .target(name: "SwiftTerminalKit", dependencies: ["CShims"], path: "Sources/SwiftTerminalKit"),
+        .executableTarget(name: "BasicDemo", dependencies: ["SwiftTerminalKit"], path: "Examples/BasicDemo"),
+        .testTarget(name: "SwiftTerminalKitTests", dependencies: ["SwiftTerminalKit"])
     ]
 )

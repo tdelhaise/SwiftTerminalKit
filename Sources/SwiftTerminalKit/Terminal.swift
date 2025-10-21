@@ -56,6 +56,7 @@ public final class Console {
     private let io: TerminalIO
     private var parser: VTParser
     private(set) public var size: (cols: Int, rows: Int)
+    private let useTrueColor: Bool
 
     public init() throws {
         #if os(Windows)
@@ -65,6 +66,7 @@ public final class Console {
         try self.io.initRawMode()
         self.parser = VTParser()
         self.size = self.io.size
+        self.useTrueColor = Console.detectTrueColor()
         enableDefaultModes()
         #endif
     }
@@ -88,8 +90,6 @@ public final class Console {
         present()
     }
 
-    // MARK: Output primitives
-
     public func enterAltScreen() { writeEsc("[?1049h") }
     public func leaveAltScreen() { writeEsc("[?1049l") }
     public func clear() { writeEsc("[2J"); writeEsc("[H") }
@@ -97,9 +97,8 @@ public final class Console {
     public func hideCursor(_ hidden: Bool) { writeEsc(hidden ? "[?25l" : "[?25h") }
     public func showCursor(_ shown: Bool) { hideCursor(!shown) }
 
-    // Legacy low-level color API
     public enum Color {
-        case index(Int)         // 0..255
+        case index(Int)
         case rgb(UInt8, UInt8, UInt8)
         case defaultColor
     }
@@ -109,21 +108,23 @@ public final class Console {
         if let fg = fg {
             switch fg {
             case .index(let n): parts += ["38","5","\(n)"]
-            case .rgb(let r, let g, let b): parts += ["38","2","\(r)","\(g)","\(b)"]
+            case .rgb(let r, let g, let b):
+                if useTrueColor { parts += ["38","2","\(r)","\(g)","\(b)"] }
+                else { parts += ["38","5","\(rgbToXtermIndex(r, g, b))"] }
             case .defaultColor: parts += ["39"]
             }
         }
         if let bg = bg {
             switch bg {
             case .index(let n): parts += ["48","5","\(n)"]
-            case .rgb(let r, let g, let b): parts += ["48","2","\(r)","\(g)","\(b)"]
+            case .rgb(let r, let g, let b):
+                if useTrueColor { parts += ["48","2","\(r)","\(g)","\(b)"] }
+                else { parts += ["48","5","\(rgbToXtermIndex(r, g, b))"] }
             case .defaultColor: parts += ["49"]
             }
         }
         if !parts.isEmpty { writeEsc("[" + parts.joined(separator: ";") + "m") }
     }
-
-    // MARK: - Palette (named + grayscale)
 
     public enum NamedColor: CaseIterable {
         case black, red, green, yellow, blue, magenta, cyan, white
@@ -153,8 +154,8 @@ public final class Console {
 
     public enum PaletteColor {
         case named(NamedColor)
-        case gray(level: Int) // 0..23 -> 232..255
-        case index(Int)       // 0..255
+        case gray(level: Int)
+        case index(Int)
         case rgb(UInt8, UInt8, UInt8)
         case `default`
     }
@@ -173,7 +174,8 @@ public final class Console {
             let idx = max(0, min(255, n))
             return [base, "5", "\(idx)"]
         case .rgb(let r, let g, let b):
-            return [base, "2", "\(r)", "\(g)", "\(b)"]
+            if useTrueColor { return [base, "2", "\(r)", "\(g)", "\(b)"] }
+            else { return [base, "5", "\(rgbToXtermIndex(r, g, b))"] }
         }
     }
 
@@ -201,7 +203,39 @@ public final class Console {
 
     private func writeEsc(_ s: String) { io.write([0x1b] + Array(s.utf8)) }
 
-    // MARK: Events
+    private static func detectTrueColor() -> Bool {
+        if let forced = ProcessInfo.processInfo.environment["SWIFTERMINALKIT_TRUECOLOR"] {
+            if forced == "0" { return false }
+            if forced == "1" { return true }
+        }
+        if let colorterm = ProcessInfo.processInfo.environment["COLORTERM"]?.lowercased() {
+            if colorterm.contains("truecolor") || colorterm.contains("24bit") { return true }
+        }
+        return false
+    }
+
+    private func rgbToXtermIndex(_ r: UInt8, _ g: UInt8, _ b: UInt8) -> Int {
+        @inline(__always) func to6(_ v: UInt8) -> Int {
+            let steps: [Int] = [0, 95, 135, 175, 215, 255]
+            var best = 0, bestd = Int.max
+            for (i, s) in steps.enumerated() {
+                let d = abs(Int(v) - s)
+                if d < bestd { bestd = d; best = i }
+            }
+            return best
+        }
+        let rr = to6(r), gg = to6(g), bb = to6(b)
+        let cubeIdx = 16 + 36*rr + 6*gg + bb
+
+        let grayLevel = Int((Int(r) + Int(g) + Int(b)) / 3)
+        let grayIdx = 232 + max(0, min(23, (grayLevel - 8) / 10))
+        let steps: [Int] = [0, 95, 135, 175, 215, 255]
+        let cubeRGB = (steps[rr], steps[gg], steps[bb])
+        let grayVal = max(8, min(238, 8 + 10 * (grayIdx - 232)))
+        let cubeDist = abs(Int(r) - cubeRGB.0) + abs(Int(g) - cubeRGB.1) + abs(Int(b) - cubeRGB.2)
+        let grayDist = abs(Int(r) - grayVal) + abs(Int(g) - grayVal) + abs(Int(b) - grayVal)
+        return (grayDist < cubeDist) ? grayIdx : cubeIdx
+    }
 
     public func pollEvent(timeoutMs: Int = -1) -> Event? {
         let newSize = io.size
@@ -214,5 +248,46 @@ public final class Console {
         if n <= 0 { return nil }
         parser.feed(buf[0..<n])
         return parser.nextEvent()
+    }
+}
+
+// File-scope extensions
+
+public extension Console.Color {
+    static func named(_ n: Console.NamedColor) -> Console.Color { .index(n.index) }
+    static func gray(level: Int) -> Console.Color {
+        let lvl = max(0, min(23, level))
+        return .index(232 + lvl)
+    }
+}
+
+public extension Console.PaletteColor {
+    static func hex(_ s: String) -> Console.PaletteColor {
+        func hexVal(_ ch: Character) -> Int? {
+            switch ch {
+            case "0"..."9": return Int(ch.asciiValue! - Character("0").asciiValue!)
+            case "a"..."f": return 10 + Int(ch.asciiValue! - Character("a").asciiValue!)
+            case "A"..."F": return 10 + Int(ch.asciiValue! - Character("A").asciiValue!)
+            default: return nil
+            }
+        }
+        func parse2(_ hi: Character, _ lo: Character) -> UInt8? {
+            guard let h = hexVal(hi), let l = hexVal(lo) else { return nil }
+            return UInt8(h*16 + l)
+        }
+        var str = s.trimmingCharacters(in: .whitespacesAndNewlines)
+        if str.hasPrefix("#") { str = String(str.dropFirst()) }
+        if str.lowercased().hasPrefix("0x") { str = String(str.dropFirst(2)) }
+        if str.count == 6 {
+            let a = Array(str)
+            guard let r = parse2(a[0], a[1]), let g = parse2(a[2], a[3]), let b = parse2(a[4], a[5]) else { return .default }
+            return .rgb(r, g, b)
+        } else if str.count == 3 {
+            let a = Array(str)
+            guard let rH = hexVal(a[0]), let gH = hexVal(a[1]), let bH = hexVal(a[2]) else { return .default }
+            return .rgb(UInt8(rH*17), UInt8(gH*17), UInt8(bH*17))
+        } else {
+            return .default
+        }
     }
 }
