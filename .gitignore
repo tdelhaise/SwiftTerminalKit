@@ -1,0 +1,46 @@
+# Swift Package Manager
+.build/
+.swiftpm/
+Packages/
+
+# Xcode (if you open the package in Xcode)
+DerivedData/
+*.xcworkspace/
+xcuserdata/
+*.xccheckout
+*.xcuserstate
+
+# Swift Playgrounds (if any)
+timeline.xctimeline
+playground.xcworkspace/
+
+# Swift tools / caches
+.swiftlint_cache
+.swiftformat
+.swift-version
+
+# Coverage & reports
+*.gcno
+*.gcda
+*.profraw
+*.profdata
+coverage/
+.swiftpm/xcode/outputs/
+
+# Editors / IDEs
+.vscode/
+.idea/
+*.iml
+
+# OS cruft
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+Thumbs.db
+
+# Logs & temp
+*.log
+.tmp/
+AGENTS.md
+GEMINI.md
