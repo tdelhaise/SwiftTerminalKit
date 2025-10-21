@@ -64,7 +64,6 @@ struct IOError: Error, CustomStringConvertible {
     var description: String { message }
 }
 
-// Safe fd_set helpers
 fileprivate func fdZero(_ set: inout fd_set) {
     let size = MemoryLayout.size(ofValue: set)
     withUnsafeMutableBytes(of: &set) { buf in

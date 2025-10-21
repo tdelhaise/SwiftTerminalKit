@@ -1,4 +1,6 @@
 import Foundation
+import Darwin
+import CShims
 
 public struct Modifiers: OptionSet {
     public let rawValue: Int
@@ -86,7 +88,7 @@ public final class Console {
         present()
     }
 
-    // MARK: Output
+    // MARK: Output primitives
 
     public func enterAltScreen() { writeEsc("[?1049h") }
     public func leaveAltScreen() { writeEsc("[?1049l") }
@@ -95,6 +97,7 @@ public final class Console {
     public func hideCursor(_ hidden: Bool) { writeEsc(hidden ? "[?25l" : "[?25h") }
     public func showCursor(_ shown: Bool) { hideCursor(!shown) }
 
+    // Legacy low-level color API
     public enum Color {
         case index(Int)         // 0..255
         case rgb(UInt8, UInt8, UInt8)
@@ -120,17 +123,79 @@ public final class Console {
         if !parts.isEmpty { writeEsc("[" + parts.joined(separator: ";") + "m") }
     }
 
+    // MARK: - Palette (named + grayscale)
+
+    public enum NamedColor: CaseIterable {
+        case black, red, green, yellow, blue, magenta, cyan, white
+        case brightBlack, brightRed, brightGreen, brightYellow, brightBlue, brightMagenta, brightCyan, brightWhite
+
+        var index: Int {
+            switch self {
+            case .black: return 0
+            case .red: return 1
+            case .green: return 2
+            case .yellow: return 3
+            case .blue: return 4
+            case .magenta: return 5
+            case .cyan: return 6
+            case .white: return 7
+            case .brightBlack: return 8
+            case .brightRed: return 9
+            case .brightGreen: return 10
+            case .brightYellow: return 11
+            case .brightBlue: return 12
+            case .brightMagenta: return 13
+            case .brightCyan: return 14
+            case .brightWhite: return 15
+            }
+        }
+    }
+
+    public enum PaletteColor {
+        case named(NamedColor)
+        case gray(level: Int) // 0..23 -> 232..255
+        case index(Int)       // 0..255
+        case rgb(UInt8, UInt8, UInt8)
+        case `default`
+    }
+
+    private func sgrParts(for color: PaletteColor, isForeground: Bool) -> [String] {
+        let base = isForeground ? "38" : "48"
+        switch color {
+        case .default:
+            return [isForeground ? "39" : "49"]
+        case .named(let n):
+            return [base, "5", "\(n.index)"]
+        case .gray(let level):
+            let lvl = max(0, min(23, level))
+            return [base, "5", "\(232 + lvl)"]
+        case .index(let n):
+            let idx = max(0, min(255, n))
+            return [base, "5", "\(idx)"]
+        case .rgb(let r, let g, let b):
+            return [base, "2", "\(r)", "\(g)", "\(b)"]
+        }
+    }
+
+    public func setColor(fg: PaletteColor?, bg: PaletteColor?) {
+        var parts: [String] = []
+        if let fg = fg { parts += sgrParts(for: fg, isForeground: true) }
+        if let bg = bg { parts += sgrParts(for: bg, isForeground: false) }
+        if !parts.isEmpty { writeEsc("[" + parts.joined(separator: ";") + "m") }
+    }
+
     public func write(_ s: String) { io.write(Array(s.utf8)) }
     public func write(_ s: String, at pos: (x:Int, y:Int), fg: Color? = nil, bg: Color? = nil) {
         moveTo(x: pos.x, y: pos.y); setColor(fg: fg, bg: bg); write(s); setColor(fg: .defaultColor, bg: .defaultColor)
+    }
+    public func write(_ s: String, at pos: (x:Int, y:Int), fg: PaletteColor?, bg: PaletteColor?) {
+        moveTo(x: pos.x, y: pos.y); setColor(fg: fg, bg: bg); write(s); setColor(fg: .default, bg: .default)
     }
     public func present() { io.flush() }
     public func setTitle(_ title: String) {
         io.write([0x1b, 0x5d] + Array("0;\(title)".utf8) + [0x1b, 0x5c])
     }
-    public func enableMouseSGR(_ on: Bool) {
-        writeEsc(on ? "[?1002h" : "[?1002l"); writeEsc(on ? "[?1006h" : "[?1006l")
-    }
+    public func enableMouseSGR(_ on: Bool) { writeEsc(on ? "[?1002h" : "[?1002l"); writeEsc(on ? "[?1006h" : "[?1006l") }
     public func enableBracketedPaste(_ on: Bool) { writeEsc(on ? "[?2004h" : "[?2004l") }
     public func enableFocusEvents(_ on: Bool) { writeEsc(on ? "[?1004h" : "[?1004l") }
 

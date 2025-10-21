@@ -5,7 +5,7 @@ do {
     let console = try Console()
     console.setTitle("SwiftTerminalKit – BasicDemo")
     console.clear()
-    console.write("SwiftTerminalKit Basic Demo", at: (2, 2), fg: .index(82))
+    console.write("SwiftTerminalKit Basic Demo", at: (2, 2), fg: .named(.brightGreen), bg: .gray(level: 3))
     console.write("Press 'q' to quit. Try arrow keys. Resize the terminal.", at: (2, 4), fg: .index(33))
 
     var running = true
@@ -17,10 +17,10 @@ do {
                 switch key {
                 case .char("q"):
                     running = false
-                case .up:    console.write("↑", at: (2, y), fg: .index(160)); y += 1
-                case .down:  console.write("↓", at: (2, y), fg: .index(34));  y += 1
-                case .left:  console.write("←", at: (2, y), fg: .index(80));  y += 1
-                case .right: console.write("→", at: (2, y), fg: .index(45));  y += 1
+                case .up:    console.write("↑", at: (2, y), fg: .named(.brightRed)); y += 1
+                case .down:  console.write("↓", at: (2, y), fg: .named(.brightGreen));  y += 1
+                case .left:  console.write("←", at: (2, y), fg: .named(.brightBlue));  y += 1
+                case .right: console.write("→", at: (2, y), fg: .named(.brightYellow));  y += 1
                 default: break
                 }
             case .resize(let cols, let rows):
