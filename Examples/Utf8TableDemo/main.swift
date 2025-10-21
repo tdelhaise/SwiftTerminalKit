@@ -17,7 +17,7 @@ private let BLOCKS: [(ClosedRange<UInt32>, String)] = [
 
 /// Table layout
 private let COLS = 16 // hex grid across
-private let LEFT = 2   // left margin
+private let LEFT = 2  // left margin
 
 // MARK: - Utilities
 
@@ -38,50 +38,59 @@ private func isRenderable(_ scalar: UnicodeScalar) -> Bool {
 
 private func renderGlyph(_ u: UInt32) -> String {
     if let scalar = UnicodeScalar(u) {
-        if isRenderable(scalar) { return String(Character(scalar)) }
+        if isRenderable(scalar) {
+			return String(Character(scalar))
+		}
         // Show a middle dot for non printable
-        return " . "
+        return "."
     }
-    return "   " // unassigned
+    return " " // unassigned
 }
 
 // MARK: - Drawing
 
-private func drawHeader(_ c: Console, title: String, range: ClosedRange<UInt32>, page: Int, total: Int, y: inout Int) {
-    c.write(title, at: (LEFT, y), fg: .named(.brightGreen), bg: .default)
-    let meta = "  [\(page+1)/\(total)]   ← / → switch • q quit"
-    c.write(meta, at: (LEFT + title.count + 1, y), fg: .named(.brightBlack), bg: .default)
-    y += 1
+private func drawHeader(_ console: Console, title: String, range: ClosedRange<UInt32>, page: Int, total: Int, y: inout Int) {
+	var outX = LEFT
+	var outY = y
+	
+	console.write(title, at: (outX, outY), fg: .named(.brightGreen), bg: .default)
+    let meta = "  [\(page+1)/\(total)] ← / → switch • q quit"
+	outX = LEFT + title.count + 1
+	console.write(meta, at: (outX, outY), fg: .named(.brightBlack), bg: .default)
+    outY += 1
 
     // Column header 0..F
-    c.write("    ", at: (LEFT, y), fg: .named(.brightBlack), bg: .default)
+	outX = LEFT
+	console.write("        ", at: (outX, outY), fg: .named(.brightBlack), bg: .default)
     for x in 0..<COLS {
-        c.write(" \(hexNibble(x))", at: (LEFT + 4 + x*2, y), fg: .named(.brightBlack), bg: .default)
+		outX = LEFT + 8 + (x*2)
+		console.write(" \(hexNibble(x))", at: (outX, outY), fg: .named(.brightBlack), bg: .default)
     }
-    y += 1
+    outY += 1
+	y = outY
 }
 
-private func drawGrid(_ c: Console, range: ClosedRange<UInt32>, startY: inout Int) {
+private func drawGrid(_ console: Console, range: ClosedRange<UInt32>, startY: inout Int) {
     let total = Int(range.count)
     let rows = (total + COLS - 1) / COLS
 
     var y = startY
     var u = Int(range.lowerBound)
 
-    for r in 0..<rows {
+	for _ in 0..<rows {
         // Left row label (e.g., "U+250x")
         let rowBase = u & ~0xF
         let rowLabel = String(format: "U+%04X", rowBase)
-        c.write(rowLabel, at: (LEFT, y), fg: .named(.brightBlack), bg: .default)
+		console.write(rowLabel, at: (LEFT, y), fg: .named(.brightBlack), bg: .default)
 
         for x in 0..<COLS {
             let code = rowBase + x
             let xpos = LEFT + 4 + x*2
             if code >= Int(range.lowerBound) && code <= Int(range.upperBound) {
-                let g = renderGlyph(UInt32(code))
-                c.write(g, at: (xpos, y), fg: .default, bg: .default)
+                let glyph = renderGlyph(UInt32(code))
+				console.write(glyph, at: (xpos, y), fg: .default, bg: .default)
             } else {
-                c.write(" ", at: (xpos, y), fg: .default, bg: .default)
+				console.write(" ", at: (xpos, y), fg: .default, bg: .default)
             }
         }
         y += 1
@@ -90,12 +99,12 @@ private func drawGrid(_ c: Console, range: ClosedRange<UInt32>, startY: inout In
     startY = y
 }
 
-private func drawFooter(_ c: Console, sampleCodePoint: UInt32, y: inout Int) {
+private func drawFooter(_ console: Console, sampleCodePoint: UInt32, y: inout Int) {
     y += 1
     // Example line: how to print a specific character with SwiftTerminalKit
     let hint = "Example: print U+\(String(format: "%04X", sampleCodePoint)) → " +
                "console.write(String(UnicodeScalar(0x\(String(format: "%04X", sampleCodePoint)))!), at: (x, y))"
-    c.write(hint, at: (LEFT, y), fg: .named(.brightYellow), bg: .default)
+	console.write(hint, at: (LEFT, y), fg: .named(.brightYellow), bg: .default)
     y += 1
 }
 
@@ -110,7 +119,7 @@ do {
 
     func renderPage() {
         console.clear()
-        var y = 2
+        var y = 10
         let (range, title) = BLOCKS[page]
         drawHeader(console, title: title, range: range, page: page, total: BLOCKS.count, y: &y)
         drawGrid(console, range: range, startY: &y)
