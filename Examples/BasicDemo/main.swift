@@ -40,7 +40,7 @@ do {
 									  bg: nil); y += 1                default: break
                 }
             case .resize(let cols, let rows):
-                console.write("Resized to \(cols)x\(rows) at \(Date())        ", at: (2, 5), fg: .index(220))
+					console.write("Resized to \(cols)x\(rows) at \(Date())        ", at: (2, 5), fg: Console.PaletteColor.named(.yellow), bg: Console.PaletteColor.gray(level: 3))
             default: break
             }
             console.present()
