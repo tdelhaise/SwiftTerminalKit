@@ -17,7 +17,7 @@ public struct Modifiers: OptionSet {
 
 public enum Key: Equatable {
 	case char(Character)
-	case enter, backspace, tab, esc
+	case enter, backspace, tab, shiftTab, esc
 	case up, down, left, right
 	case home, end, pageUp, pageDown
 	case insert, deleteKey

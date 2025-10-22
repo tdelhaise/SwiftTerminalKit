@@ -23,11 +23,11 @@ final class VTParser {
                     let c = bytes[i+2]
                     let key: Key?
                     switch c {
-                    case 0x41: key = .up
-                    case 0x42: key = .down
-                    case 0x43: key = .right
-                    case 0x44: key = .left
-                    default: key = .unknown
+						case 0x41: key = .up
+						case 0x42: key = .down
+						case 0x43: key = .right
+						case 0x44: key = .left
+						default: key = .unknown
                     }
                     if let k = key {
                         eventQueue.append(.key(k, []))
@@ -42,6 +42,14 @@ final class VTParser {
                 eventQueue.append(.key(.backspace, []))
                 i += 1
                 continue
+			} else if b == 0x09 {
+				eventQueue.append(.key(.tab, []))
+				i += 1
+				continue
+			} else if b == 0x19 {
+				eventQueue.append(.key(.shiftTab, [Modifiers.shift]))
+				i += 1
+				continue
             } else if b == 0x0d || b == 0x0a {
                 eventQueue.append(.key(.enter, []))
                 i += 1
