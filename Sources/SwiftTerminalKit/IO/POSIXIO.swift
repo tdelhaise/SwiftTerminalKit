@@ -1,5 +1,9 @@
 import Foundation
+#if canImport(Darwin)
 import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#endif
 import CShims
 
 final class POSIXIO: TerminalIO {
@@ -29,12 +33,23 @@ final class POSIXIO: TerminalIO {
 
         var tv = timeval(tv_sec: 0, tv_usec: 0)
         var tvPtr: UnsafeMutablePointer<timeval>? = nil
-        if timeoutMs >= 0 {
-            tv.tv_sec = time_t(timeoutMs / 1000)
-            tv.tv_usec = suseconds_t((timeoutMs % 1000) * 1000)
-            tvPtr = .allocate(capacity: 1)
-            tvPtr!.initialize(to: tv)
-        }
+		
+		// Inside POSIXIO.swift, near where you build `timeval` for select()
+#if canImport(Darwin)
+		typealias STUsec = __darwin_suseconds_t
+#else
+		typealias STUsec = suseconds_t
+#endif
+		
+		// ...
+		if timeoutMs < 0 {
+			tvPtr = nil
+		} else {
+			let usec: STUsec = STUsec((timeoutMs % 1000) * 1000)
+			tv = timeval(tv_sec: timeoutMs / 1000, tv_usec: usec)
+			tvPtr = UnsafeMutablePointer<timeval>.allocate(capacity: 1)
+			tvPtr!.initialize(to: tv)
+		}
 
         let sel = select(inFD + 1, &rfds, nil, nil, tvPtr)
         if let p = tvPtr { p.deinitialize(count: 1); p.deallocate() }
