@@ -25,8 +25,10 @@ do {
 				case .resize(let c, let r):
 					cols = c; rows = r
 					screen.resizeToConsole()
-					right.frame = Rect(c/2, 4, max(24, c/2 - 4), max(8, r - 8)); right.invalidate()
-					left.frame  = Rect(2, 2, max(20, c/2 - 3), max(6, r - 4));   left.invalidate()
+					right.frame = Rect(c/2, 4, max(24, c/2 - 4), max(8, r - 8))
+					right.invalidate()
+					left.frame  = Rect(2, 2, max(20, c/2 - 3), max(6, r - 4))
+					left.invalidate()
 					screen.render()
 				case .key(let k, _):
 					switch k {
@@ -35,22 +37,28 @@ do {
 						case .tab:
 							// toggle focus
 							if left.hasFocus {
+								fputs("focus will be set on right\n", stderr)
 								screen.setFocus(right)
 							} else {
+								fputs("focus will be set on left\n", stderr)
 								screen.setFocus(left)
 							}
-							screen.render()
 						case .left:
-							right.frame.x = max(1, right.frame.x - 1); screen.render()
+							let focusPanel = left.hasFocus ? left : right
+							focusPanel.frame.x = max(1, focusPanel.frame.x - 1)
 						case .right:
-							right.frame.x = min(cols - 3, right.frame.x + 1); screen.render()
+							let focusPanel = left.hasFocus ? left : right
+							focusPanel.frame.x = min(cols - 3, focusPanel.frame.x + 1)
 						case .up:
-							right.frame.y = max(1, right.frame.y - 1); screen.render()
+							let focusPanel = left.hasFocus ? left : right
+							focusPanel.frame.y = max(1, focusPanel.frame.y - 1)
 						case .down:
-							right.frame.y = min(rows - 3, right.frame.y + 1); screen.render()
+							let focusPanel = left.hasFocus ? left : right
+							focusPanel.frame.y = min(rows - 3, focusPanel.frame.y + 1)
 						default:
 							break
 					}
+					screen.render()
 				default:
 					break
             }
