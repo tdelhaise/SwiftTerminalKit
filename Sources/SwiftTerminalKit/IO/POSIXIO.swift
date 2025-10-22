@@ -22,7 +22,11 @@ final class POSIXIO: TerminalIO {
 
     func write(_ bytes: [UInt8]) {
         bytes.withUnsafeBytes { ptr in
-            _ = Darwin.write(outFD, ptr.baseAddress, ptr.count)
+#if canImport(Darwin)
+			_ = Darwin.write(outFD, ptr.baseAddress, ptr.count)
+#elseif canImport(Glibc)
+			_ = Glibc.write(outFD, ptr.baseAddress, ptr.count)
+#endif
         }
     }
 
@@ -56,7 +60,11 @@ final class POSIXIO: TerminalIO {
         if sel <= 0 { return 0 }
 
         return buffer.withUnsafeMutableBytes { ptr in
-            let n = Darwin.read(inFD, ptr.baseAddress, ptr.count)
+#if canImport(Darwin)
+			let n = Darwin.read(inFD, ptr.baseAddress, ptr.count)
+#elseif canImport(Glibc)
+			let n = Glibc.read(inFD, ptr.baseAddress, ptr.count)
+#endif
             return n
         }
     }
