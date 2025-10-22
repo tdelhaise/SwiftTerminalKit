@@ -34,7 +34,7 @@ do {
 					switch k {
 						case .char("q"):
 							running = false
-						case .tab:
+						case .char("f"), .tab:
 							// toggle focus
 							if left.hasFocus {
 								fputs("focus will be set on right\n", stderr)
