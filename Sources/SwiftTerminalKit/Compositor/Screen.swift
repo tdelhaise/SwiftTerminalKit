@@ -28,10 +28,14 @@ public final class Screen {
 		if focused === v { focused = nil }
 	}
 	
-	public func setFocus(_ v: View?) {
-		focused?.hasFocus = false
+	public func setFocus(_ v: View?) {		
+		let old = focused
+		if old === v { return }           // no-op if nothing changes
+		old?.hasFocus = false
 		focused = v
 		focused?.hasFocus = true
+		// invalidate BOTH so headers/markers redraw
+		old?.invalidate()
 		focused?.invalidate()
 	}
 	
