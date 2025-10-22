@@ -224,7 +224,9 @@ public final class Console {
 		}
 	}
 	
-	public func write(_ s: String) { io.write(Array(s.utf8)) }
+	public func write(_ s: String) {
+		io.write(Array(s.utf8))
+	}
 	
 	@available(*, deprecated, message: "Use the PaletteColor overload of write(_:at:fg:bg:) instead.")
 	public func write(_ s: String, at pos: (x:Int, y:Int), fg: Color? = nil, bg: Color? = nil) {
