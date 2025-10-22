@@ -30,20 +30,29 @@ do {
 					screen.render()
 				case .key(let k, _):
 					switch k {
-						case .char("q"): running = false
+						case .char("q"):
+							running = false
 						case .tab:
 							// toggle focus
 							if left.hasFocus {
-								screen.setFocus(right) } else { screen.setFocus(left)
-								}
+								screen.setFocus(right)
+							} else {
+								screen.setFocus(left)
+							}
 							screen.render()
-						case .left:  right.frame.x = max(1, right.frame.x - 1); screen.render()
-						case .right: right.frame.x = min(cols - 3, right.frame.x + 1); screen.render()
-						case .up:    right.frame.y = max(1, right.frame.y - 1); screen.render()
-						case .down:  right.frame.y = min(rows - 3, right.frame.y + 1); screen.render()
-						default: break
+						case .left:
+							right.frame.x = max(1, right.frame.x - 1); screen.render()
+						case .right:
+							right.frame.x = min(cols - 3, right.frame.x + 1); screen.render()
+						case .up:
+							right.frame.y = max(1, right.frame.y - 1); screen.render()
+						case .down:
+							right.frame.y = min(rows - 3, right.frame.y + 1); screen.render()
+						default:
+							break
 					}
-				default: break
+				default:
+					break
             }
         }
     }

@@ -92,12 +92,29 @@ public final class Console {
 	
 	// MARK: Output primitives
 	
-	public func enterAltScreen() { writeEsc("[?1049h") }
-	public func leaveAltScreen() { writeEsc("[?1049l") }
-	public func clear() { writeEsc("[2J"); writeEsc("[H") }
-	public func moveTo(x: Int, y: Int) { writeEsc("[\(y);\(x)H") }
-	public func hideCursor(_ hidden: Bool) { writeEsc(hidden ? "[?25l" : "[?25h") }
-	public func showCursor(_ shown: Bool) { hideCursor(!shown) }
+	public func enterAltScreen() {
+		writeEsc("[?1049h")
+	}
+	
+	public func leaveAltScreen() {
+		writeEsc("[?1049l")
+	}
+	
+	public func clear() {
+		writeEsc("[2J"); writeEsc("[H")
+	}
+	
+	public func moveTo(x: Int, y: Int) {
+		writeEsc("[\(y);\(x)H")
+	}
+	
+	public func hideCursor(_ hidden: Bool) {
+		writeEsc(hidden ? "[?25l" : "[?25h")
+	}
+	
+	public func showCursor(_ shown: Bool) {
+		hideCursor(!shown)
+	}
 	
 	// MARK: Legacy low-level color API (kept but deprecated)
 	public enum Color {
@@ -196,31 +213,57 @@ public final class Console {
 	
 	public func setColor(fg: PaletteColor?, bg: PaletteColor?) {
 		var parts: [String] = []
-		if let fg = fg { parts += sgrParts(for: fg, isForeground: true) }
-		if let bg = bg { parts += sgrParts(for: bg, isForeground: false) }
-		if !parts.isEmpty { writeEsc("[" + parts.joined(separator: ";") + "m") }
+		if let fg = fg {
+			parts += sgrParts(for: fg, isForeground: true)
+		}
+		if let bg = bg {
+			parts += sgrParts(for: bg, isForeground: false)
+		}
+		if !parts.isEmpty {
+			writeEsc("[" + parts.joined(separator: ";") + "m")
+		}
 	}
 	
 	public func write(_ s: String) { io.write(Array(s.utf8)) }
 	
 	@available(*, deprecated, message: "Use the PaletteColor overload of write(_:at:fg:bg:) instead.")
 	public func write(_ s: String, at pos: (x:Int, y:Int), fg: Color? = nil, bg: Color? = nil) {
-		moveTo(x: pos.x, y: pos.y); setColor(fg: fg, bg: bg); write(s); setColor(fg: .defaultColor, bg: .defaultColor)
+		moveTo(x: pos.x, y: pos.y);
+		setColor(fg: fg, bg: bg);
+		write(s);
+		setColor(fg: .defaultColor, bg: .defaultColor)
 	}
 	
 	public func write(_ s: String, at pos: (x:Int, y:Int), fg: PaletteColor?, bg: PaletteColor?) {
-		moveTo(x: pos.x, y: pos.y); setColor(fg: fg, bg: bg); write(s); setColor(fg: .default, bg: .default)
+		moveTo(x: pos.x, y: pos.y);
+		setColor(fg: fg, bg: bg);
+		write(s);
+		setColor(fg: .default, bg: .default)
 	}
 	
-	public func present() { io.flush() }
+	public func present() {
+		io.flush()
+	}
+	
 	public func setTitle(_ title: String) {
 		io.write([0x1b, 0x5d] + Array("0;\(title)".utf8) + [0x1b, 0x5c])
 	}
-	public func enableMouseSGR(_ on: Bool) { writeEsc(on ? "[?1002h" : "[?1002l"); writeEsc(on ? "[?1006h" : "[?1006l") }
-	public func enableBracketedPaste(_ on: Bool) { writeEsc(on ? "[?2004h" : "[?2004l") }
-	public func enableFocusEvents(_ on: Bool) { writeEsc(on ? "[?1004h" : "[?1004l") }
 	
-	private func writeEsc(_ s: String) { io.write([0x1b] + Array(s.utf8)) }
+	public func enableMouseSGR(_ on: Bool) {
+		writeEsc(on ? "[?1002h" : "[?1002l"); writeEsc(on ? "[?1006h" : "[?1006l")
+	}
+	
+	public func enableBracketedPaste(_ on: Bool) {
+		writeEsc(on ? "[?2004h" : "[?2004l")
+	}
+	
+	public func enableFocusEvents(_ on: Bool) {
+		writeEsc(on ? "[?1004h" : "[?1004l")
+	}
+	
+	private func writeEsc(_ s: String) {
+		io.write([0x1b] + Array(s.utf8))
+	}
 	
 	// MARK: Truecolor detection + RGB→256 fallback
 	
@@ -268,7 +311,9 @@ public final class Console {
 		}
 		var buf = [UInt8](repeating: 0, count: 4096)
 		let n = io.read(into: &buf, timeoutMs: timeoutMs)
-		if n <= 0 { return nil }
+		if n <= 0 {
+			return nil
+		}
 		parser.feed(buf[0..<n])
 		return parser.nextEvent()
 	}
@@ -292,10 +337,14 @@ public extension Console.PaletteColor {
 	static func hex(_ s: String) -> Console.PaletteColor {
 		func hexVal(_ ch: Character) -> Int? {
 			switch ch {
-				case "0"..."9": return Int(ch.asciiValue! - Character("0").asciiValue!)
-				case "a"..."f": return 10 + Int(ch.asciiValue! - Character("a").asciiValue!)
-				case "A"..."F": return 10 + Int(ch.asciiValue! - Character("A").asciiValue!)
-				default: return nil
+				case "0"..."9":
+					return Int(ch.asciiValue! - Character("0").asciiValue!)
+				case "a"..."f":
+					return 10 + Int(ch.asciiValue! - Character("a").asciiValue!)
+				case "A"..."F":
+					return 10 + Int(ch.asciiValue! - Character("A").asciiValue!)
+				default:
+					return nil
 			}
 		}
 		func parse2(_ hi: Character, _ lo: Character) -> UInt8? {
@@ -307,11 +356,15 @@ public extension Console.PaletteColor {
 		if str.lowercased().hasPrefix("0x") { str = String(str.dropFirst(2)) }
 		if str.count == 6 {
 			let a = Array(str)
-			guard let r = parse2(a[0], a[1]), let g = parse2(a[2], a[3]), let b = parse2(a[4], a[5]) else { return .default }
+			guard let r = parse2(a[0], a[1]), let g = parse2(a[2], a[3]), let b = parse2(a[4], a[5]) else {
+				return .default
+			}
 			return .rgb(r, g, b)
 		} else if str.count == 3 {
 			let a = Array(str)
-			guard let rH = hexVal(a[0]), let gH = hexVal(a[1]), let bH = hexVal(a[2]) else { return .default }
+			guard let rH = hexVal(a[0]), let gH = hexVal(a[1]), let bH = hexVal(a[2]) else {
+				return .default
+			}
 			return .rgb(UInt8(rH*17), UInt8(gH*17), UInt8(bH*17))
 		} else {
 			return .default
