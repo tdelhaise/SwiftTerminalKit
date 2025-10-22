@@ -12,6 +12,7 @@ let package = Package(
 		.executable(name: "ColorPaletteDemo", targets: ["ColorPaletteDemo"]),
 		.executable(name: "GradientDemo", targets: ["GradientDemo"]),
 		.executable(name: "Utf8TableDemo", targets: ["Utf8TableDemo"]),
+		.executable(name: "ViewsDemo", targets: ["ViewsDemo"]),
     ],
     targets: [
         .target(name: "CShims", path: "CShims", publicHeadersPath: "."),
@@ -23,6 +24,11 @@ let package = Package(
 			name: "Utf8TableDemo",
 			dependencies: ["SwiftTerminalKit"],
 			path: "Examples/Utf8TableDemo"
+		),
+		.executableTarget(
+			name: "ViewsDemo",
+			dependencies: ["SwiftTerminalKit"],
+			path: "Examples/ViewsDemo"
 		),
         .testTarget(name: "SwiftTerminalKitTests", dependencies: ["SwiftTerminalKit"])
     ]
