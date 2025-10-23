@@ -62,6 +62,28 @@ final class EditorView: View {
 	}
 }
 
+// Affiche un log sur la dernière ligne sans casser l'écran
+func logAtBottom(_ console: Console, _ text: String) {
+	let cols = console.size.cols
+	let rows = console.size.rows
+	let msg  = String(text.prefix(max(0, cols))) // évite de dépasser
+	
+	// Sauver la position du curseur
+	console.write("\u{001B}[s")
+	// Aller au début de la dernière ligne
+	console.moveTo(x: 1, y: rows)
+	// Effacer toute la ligne
+	console.write("\u{001B}[2K")
+	// Couleurs du log (optionnel)
+	console.setColor(fg: .named(.brightYellow), bg: .gray(level: 3))
+	console.write(msg)
+	// Reset couleurs
+	console.setColor(fg: .default, bg: .default)
+	// Restaurer la position du curseur
+	console.write("\u{001B}[u")
+}
+
+
 do {
 	let console = try Console()
 	console.clear()
@@ -91,8 +113,15 @@ do {
 				return true
 				
 			case .key(let k):
+				if case .char(let ch) = k.keyCode {
+					let scal = ch.unicodeScalars.first!.value
+					logAtBottom(console, "KEY char=\(ch) U+\(String(format: "%04X", scal)) mods=\(k.mods.rawValue)")
+				}
 				switch k.keyCode {
 					case .char(let ch):
+						if ch == "$" {
+							return false
+						}
 						if k.mods.contains(.ctrl) {
 							if ch == "q" || ch == "Q" {
 								return false
@@ -106,8 +135,14 @@ do {
 								return true
 							}
 						}
-						if ch == "\n" || ch == "\r" { editor.newline(); return true }
-						if ch == "\u{8}" || ch == "\u{7F}" { editor.backspace(); return true }
+						if ch == "\n" || ch == "\r" {
+							editor.newline();
+							return true
+						}
+						if ch == "\u{8}" || ch == "\u{7F}" {
+							editor.backspace();
+							return true
+						}
 						if ch.isNewline {
 							editor.newline();
 							return true
@@ -116,14 +151,25 @@ do {
 							editor.insert(ch)
 						}
 						return true
-					case .left:  editor.moveLeft();  return true
-					case .right: editor.moveRight(); return true
-					case .up:    editor.moveUp();    return true
-					case .down:  editor.moveDown();  return true
-					case .tab:   editor.insert("\t"); return true
-					default:     return true
+					case .left:
+						editor.moveLeft();
+						return true
+					case .right:
+						editor.moveRight();
+						return true
+					case .up:
+						editor.moveUp();
+						return true
+					case .down:
+						editor.moveDown();
+						return true
+					case .tab:
+						editor.insert("\t");
+						return true
+					default:
+						logAtBottom(console, "KEY \(k.keyCode) mods=\(k.mods.rawValue)")
+						return true
 				}
-				
 			default:
 				return true
 		}

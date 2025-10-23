@@ -47,9 +47,6 @@ do {
 					case .tab:
 						screen.setFocus(left.hasFocus ? right : left)
 						return true
-					case .shiftTab:
-						screen.setFocus(right.hasFocus ? left : right)
-						return true
 					case .left:
 						right.frame.x = max(1, right.frame.x - 1)
 						return true

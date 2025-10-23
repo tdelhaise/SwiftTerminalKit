@@ -1,116 +1,138 @@
+//
+//  KeyModel.swift
+//  SwiftTerminalKit
+//
+
 import Foundation
 
-/// Cross-platform modifier mask used by SwiftTerminalKit.
-public struct KeyMods: OptionSet, Codable, Hashable {
+// MARK: - Modificateurs exposés côté Input
+
+public struct KeyMods: OptionSet {
 	public let rawValue: Int
 	public init(rawValue: Int) { self.rawValue = rawValue }
-	public static let shift = KeyMods(rawValue: 1<<0)
-	public static let ctrl  = KeyMods(rawValue: 1<<1)
-	public static let alt   = KeyMods(rawValue: 1<<2)
-	public static let meta  = KeyMods(rawValue: 1<<3)
+	
+	public static let shift = KeyMods(rawValue: 1 << 0)
+	public static let ctrl  = KeyMods(rawValue: 1 << 1)
+	public static let alt   = KeyMods(rawValue: 1 << 2)
+	public static let meta  = KeyMods(rawValue: 1 << 3)
 }
 
-/// Virtual key codes + text channel (utf8) à la Turbo Vision.
-public enum KeyCode: Equatable, Hashable {
-	case char(Character)       // printable or control-as-char
-	case enter, esc, backspace, tab, shiftTab
-	case up, down, left, right
+// MARK: - Codes de touches normalisés
+
+public enum KeyCode: Equatable {
+	case char(Character)   // y compris contrôle normalisé (ex: 'Q' avec .ctrl)
+	case enter
+	case tab
+	case backspace
+	
+	case left, right, up, down
 	case home, end, pageUp, pageDown
-	case insert, delete
-	case f(Int)                // F1..F12
+	case function(Int)
+	
+	case unknown
 }
 
-public struct KeyEvent: Equatable, Hashable {
-	public var keyCode: KeyCode
-	public var mods: KeyMods
-	/// up to 4 bytes of utf8 for text input (printable)
-	public var utf8: [UInt8]
+// MARK: - Evénement clavier
+
+public struct KeyEvent: Equatable {
+	public let keyCode: KeyCode
+	public let mods: KeyMods
+	public let utf8: [UInt8]   // charge utile brute utile en debug
+	
 	public init(_ keyCode: KeyCode, mods: KeyMods = [], utf8: [UInt8] = []) {
-		self.keyCode = keyCode; self.mods = mods; self.utf8 = utf8
+		self.keyCode = keyCode
+		self.mods = mods
+		self.utf8 = utf8
 	}
 }
 
-/// Événements d’entrée “unifiés” côté SwiftTerminalKit.
-public enum InputEvent: Equatable {
-	case key(KeyEvent)
-	case paste(String)  // aligne sur Event.paste(String)
-	case mouse(x: Int, y: Int, button: MouseButton, type: MouseEventType, mods: KeyMods)
-	case resize(cols: Int, rows: Int)
-}
+// MARK: - Adaptation depuis ton Event haut-niveau
 
 public extension KeyEvent {
-	/// Adaptateur depuis ton `Event` global (défini dans Terminal.swift).
-	static func fromConsoleEvent(_ ev: Event) -> KeyEvent? {
+	/// Convertit `Event` -> `KeyEvent` (si c’est un .key)
+	static func fromEvent(_ ev: Event) -> KeyEvent? {
 		switch ev {
 			case .key(let k, let m):
-				var mods = modsFromConsole(m)
+				let mods = Self.modsFrom(m)
 				
 				switch k {
-					case .char("\t"):
-						if mods.contains(.shift) {
-							mods.remove(.shift)
-							return KeyEvent(.shiftTab, mods: mods, utf8: [0x09])
+					case .char(let ch):
+						// 1) Normalisation des contrôles C0 ^A..^Z
+						if let (normCh, ctrlMod) = normalizeControlChar(ch) {
+							var finalMods = mods
+							if ctrlMod { finalMods.insert(.ctrl) }
+							let u = normCh.unicodeScalars.first?.value
+							let raw = u != nil ? [UInt8(u! & 0xFF)] : []
+							return KeyEvent(.char(normCh), mods: finalMods, utf8: raw)
 						}
-						return KeyEvent(.tab, mods: mods, utf8: [0x09])
 						
-					case .tab:
-						if mods.contains(.shift) {
-							mods.remove(.shift)
-							return KeyEvent(.shiftTab, mods: mods, utf8: [0x09])
+						// 2) DEL 0x7F -> backspace (optionnel mais pratique)
+						if isDel(ch) {
+							return KeyEvent(.backspace, mods: mods, utf8: [0x7F])
 						}
-						return KeyEvent(.tab, mods: mods, utf8: [0x09])
 						
-					case .enter:
-						return KeyEvent(.enter, mods: mods, utf8: [0x0D])
+						// 3) Tab / Enter tels que caractères
+						if ch == "\t" { return KeyEvent(.tab, mods: mods, utf8: [0x09]) }
+						if ch == "\r" || ch == "\n" { return KeyEvent(.enter, mods: mods, utf8: [0x0D]) }
 						
-					case .backspace:
-						return KeyEvent(.backspace, mods: mods, utf8: [0x08])
-						
-					case .esc:
-						return KeyEvent(.esc, mods: mods, utf8: [0x1B])
-						
-					case .char(let c):
-						var modsNorm = mods
-						if let u = c.unicodeScalars.first {
-							let v = u.value
-							// ASCII control: 1..26  => ^A..^Z
-							if (1...26).contains(v) {
-								let base = Character(UnicodeScalar(UInt32(96) + v)!) // 96 = '`' => a..z
-								modsNorm.insert(.ctrl)
-								return KeyEvent(.char(base), mods: modsNorm, utf8: [UInt8(v)])
-							}
+						// 4) ESC si livré comme caractère (pas de .escape dans ton Key)
+						if isEscape(ch) {
+							// on l’expose côté app comme char U+001B (si tu veux un case .escape, on pourra l’ajouter plus tard)
+							return KeyEvent(.char(ch), mods: mods, utf8: [0x1B])
 						}
-						// Sinon, chemin normal : lettre avec (ou sans) modifieurs
-						// (On peut normaliser en minuscule si tu préfères)
-						let u8 = Array(String(c).utf8)
-						return KeyEvent(.char(c), mods: modsNorm, utf8: u8)
-
-					case .up:    return KeyEvent(.up, mods: mods)
-					case .down:  return KeyEvent(.down, mods: mods)
-					case .left:  return KeyEvent(.left, mods: mods)
-					case .right: return KeyEvent(.right, mods: mods)
 						
-						// Décommente si ton `Key` expose ces cas :
-						// case .home:     return KeyEvent(.home, mods: mods)
-						// case .end:      return KeyEvent(.end, mods: mods)
-						// case .pageUp:   return KeyEvent(.pageUp, mods: mods)
-						// case .pageDown: return KeyEvent(.pageDown, mods: mods)
-						// case .insert:   return KeyEvent(.insert, mods: mods)
-						// case .delete:   return KeyEvent(.delete, mods: mods)
-						// case .f(let n): return KeyEvent(.f(n), mods: mods)
+						// 5) Texte imprimable
+						let raw = String(ch).utf8.map { $0 }
+						return KeyEvent(.char(ch), mods: mods, utf8: raw)
+						
+					case .enter:     return KeyEvent(.enter, mods: mods, utf8: [0x0D])
+					case .tab:       return KeyEvent(.tab, mods: mods, utf8: [0x09])
+					case .backspace: return KeyEvent(.backspace, mods: mods, utf8: [0x7F])
+						
+					case .left:      return KeyEvent(.left, mods: mods)
+					case .right:     return KeyEvent(.right, mods: mods)
+					case .up:        return KeyEvent(.up, mods: mods)
+					case .down:      return KeyEvent(.down, mods: mods)
+						
+					case .home:      return KeyEvent(.home, mods: mods)
+					case .end:       return KeyEvent(.end, mods: mods)
+					case .pageUp:    return KeyEvent(.pageUp, mods: mods)
+					case .pageDown:  return KeyEvent(.pageDown, mods: mods)
+						
+					case .function(let n):
+						return KeyEvent(.function(n), mods: mods)
 						
 					default:
-						return nil
+						return KeyEvent(.unknown, mods: mods)
 				}
 				
-			case .resize, .paste, .mouse, .focusGained, .focusLost:
-				// Ces événements sont gérés plus haut (EventQueue) ou ignorés.
+			default:
 				return nil
 		}
 	}
-	
-	/// Mappe `Modifiers` (lib interne) vers `KeyMods` (API publique STK).
-	static func modsFromConsole(_ m: Modifiers) -> KeyMods {
+}
+
+// MARK: - Helpers
+
+/// ^A..^Z (0x01..0x1A) -> ('A'..'Z', ctrl = true)
+fileprivate func normalizeControlChar(_ ch: Character) -> (Character, Bool)? {
+	guard let v = ch.unicodeScalars.first?.value else { return nil }
+	if 0x01...0x1A ~= v, let us = UnicodeScalar(0x40 + v) { // 0x41='A'
+		return (Character(us), true)
+	}
+	return nil
+}
+
+fileprivate func isDel(_ ch: Character) -> Bool {
+	ch.unicodeScalars.first?.value == 0x7F
+}
+
+fileprivate func isEscape(_ ch: Character) -> Bool {
+	ch.unicodeScalars.first?.value == 0x1B
+}
+
+fileprivate extension KeyEvent {
+	static func modsFrom(_ m: Modifiers) -> KeyMods {
 		var out: KeyMods = []
 		if m.contains(.shift) { out.insert(.shift) }
 		if m.contains(.ctrl)  { out.insert(.ctrl)  }

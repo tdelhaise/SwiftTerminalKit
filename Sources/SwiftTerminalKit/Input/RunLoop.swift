@@ -1,36 +1,39 @@
 import Foundation
 
-/// A simple run loop object that can be used both synchronously and asynchronously.
 public final class STKRunLoop {
+	private let console: Console
+	private let screen: Screen
 	private let queue: EventQueue
-	private let screen: Screen?  // optional: auto-flush before blocking
 	
-	public init(console: Console, screen: Screen? = nil) {
-		self.queue = EventQueue(console: console)
+	public init(console: Console, screen: Screen) {
+		self.console = console
 		self.screen = screen
+		self.queue = EventQueue(console: console)
 	}
 	
-	/// Synchronous style: provide a handler; returns when handler says to stop.
+	/// Boucle synchrone : retourne quand le handler renvoie false.
 	@discardableResult
 	public func runSync(pollMs: Int = 50, handle: (InputEvent) -> Bool) -> Int {
 		var frames = 0
 		while true {
-			// allow compositor to flush before blocking
-			screen?.render()
 			if let ev = queue.nextEvent(timeoutMs: pollMs) {
-				let keepGoing = handle(ev)
+				let keep = handle(ev)
+				screen.render()
 				frames += 1
-				if !keepGoing { break }
+				if !keep { break }
+			} else {
+				// Aucun événement pendant ce poll ; on pourrait rafraîchir conditionnellement si nécessaire.
+				// screen.render()
 			}
 		}
 		return frames
 	}
 	
-	/// Asynchronous style using Swift concurrency.
+	/// Variante asynchrone (Swift Concurrency)
 	public func runAsync(pollMs: Int = 50, handle: @escaping (InputEvent) async -> Bool) async {
 		for await ev in queue.eventsStream(pollEveryMs: pollMs) {
 			let keep = await handle(ev)
-			screen?.render()
+			screen.render()
 			if !keep { break }
 		}
 	}
