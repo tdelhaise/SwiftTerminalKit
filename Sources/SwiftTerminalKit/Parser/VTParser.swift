@@ -54,9 +54,6 @@ final class VTParser {
                 eventQueue.append(.key(.enter, []))
                 i += 1
                 continue
-            } else if b < 0x20 {
-                i += 1
-                continue
             } else {
                 let remaining = bytes[i...]
                 let chars = utf8.feed(remaining)
