@@ -4,7 +4,7 @@ public final class Screen {
 	private let console: Console
 	private var surface: Surface
 	private var views: [View] = []
-	private var focused: View? = nil
+	public private(set) var focusedView: View? = nil
 	
 	// Screen-wide background (base layer)
 	public var backgroundFG: Console.PaletteColor = .default
@@ -25,18 +25,18 @@ public final class Screen {
 	public func addView(_ v: View) { views.append(v); sortViews() }
 	public func removeView(_ v: View) {
 		if let i = views.firstIndex(where: { $0 === v }) { views.remove(at: i) }
-		if focused === v { focused = nil }
+		if focusedView === v { focusedView = nil }
 	}
 	
 	public func setFocus(_ v: View?) {		
-		let old = focused
+		let old = focusedView
 		if old === v { return }           // no-op if nothing changes
 		old?.hasFocus = false
-		focused = v
-		focused?.hasFocus = true
+		focusedView = v
+		focusedView?.hasFocus = true
 		// invalidate BOTH so headers/markers redraw
 		old?.invalidate()
-		focused?.invalidate()
+		focusedView?.invalidate()
 	}
 	
 	public func resizeToConsole() {

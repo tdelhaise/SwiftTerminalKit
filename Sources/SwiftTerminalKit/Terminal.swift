@@ -59,49 +59,95 @@ public protocol TerminalIO {
 public final class Console {
 	private let io: TerminalIO
 	private var parser: VTParser
+	public let caps: TerminalCaps
 	private(set) public var size: (cols: Int, rows: Int)
 	private let useTrueColor: Bool
 	
+	private var isShutdown = false
+	private var altScreenActive = false
+	private var mouseReportingActive = false
+	private var bracketedPasteActive = false
+	private var focusEventsActive = false
+	private let capsDebugEnabled: Bool
+	private let capsDebugLine: String?
+	private var capsDebugPrinted = false
+	
 	public init() throws {
 #if os(Windows)
+		self.capsDebugEnabled = false
+		self.capsDebugLine = nil
 		throw NSError(domain: "SwiftTerminalKit", code: 1, userInfo: [NSLocalizedDescriptionKey: "Windows not yet implemented"])
 #else
 		self.io = POSIXIO()
 		try self.io.initRawMode()
 		self.parser = VTParser()
+		self.caps = TerminalCaps.detect()
 		self.size = self.io.size
-		self.useTrueColor = Console.detectTrueColor()
+		self.useTrueColor = (caps.color == .truecolor)
+		let env = ProcessInfo.processInfo.environment
+		self.capsDebugEnabled = Console.shouldLogCaps(env: env)
+		self.capsDebugLine = Console.buildCapsDebugLine(for: caps, env: env)
 		enableDefaultModes()
 #endif
 	}
 	
 	deinit {
-		leaveAltScreen()
-		io.restoreMode()
-		showCursor(true)
-		enableMouseSGR(false)
-		enableBracketedPaste(false)
-		enableFocusEvents(false)
+		shutdown()
 	}
 	
 	private func enableDefaultModes() {
-		enterAltScreen()
+		if caps.supportsAltScreen {
+			enterAltScreen()
+			altScreenActive = true
+		}
 		hideCursor(true)
-		enableMouseSGR(true)
-		enableBracketedPaste(true)
-		enableFocusEvents(true)
+		if caps.supportsMouse {
+			enableMouseSGR(true)
+			mouseReportingActive = true
+		}
+		if caps.supportsBracketedPaste {
+			enableBracketedPaste(true)
+			bracketedPasteActive = true
+		}
+		if caps.supportsFocusEvents {
+			enableFocusEvents(true)
+			focusEventsActive = true
+		}
 		clear()
 		present()
+		if capsDebugEnabled, !capsDebugPrinted, let line = capsDebugLine,
+		   let data = (line + "\n").data(using: .utf8) {
+			FileHandle.standardError.write(data)
+			capsDebugPrinted = true
+		}
+	}
+	
+	public func shutdown() {
+		guard !isShutdown else { return }
+		if mouseReportingActive { enableMouseSGR(false) }
+		if bracketedPasteActive { enableBracketedPaste(false) }
+		if focusEventsActive { enableFocusEvents(false) }
+		showCursor(true)
+		if altScreenActive { leaveAltScreen() }
+		io.restoreMode()
+		if capsDebugEnabled, !capsDebugPrinted, let line = capsDebugLine,
+		   let data = (line + "\n").data(using: .utf8) {
+			FileHandle.standardError.write(data)
+			capsDebugPrinted = true
+		}
+		isShutdown = true
 	}
 	
 	// MARK: Output primitives
 	
 	public func enterAltScreen() {
 		writeEsc("[?1049h")
+		altScreenActive = true
 	}
 	
 	public func leaveAltScreen() {
 		writeEsc("[?1049l")
+		altScreenActive = false
 	}
 	
 	public func clear() {
@@ -257,14 +303,17 @@ public final class Console {
 	
 	public func enableMouseSGR(_ on: Bool) {
 		writeEsc(on ? "[?1002h" : "[?1002l"); writeEsc(on ? "[?1006h" : "[?1006l")
+		mouseReportingActive = on
 	}
 	
 	public func enableBracketedPaste(_ on: Bool) {
 		writeEsc(on ? "[?2004h" : "[?2004l")
+		bracketedPasteActive = on
 	}
 	
 	public func enableFocusEvents(_ on: Bool) {
 		writeEsc(on ? "[?1004h" : "[?1004l")
+		focusEventsActive = on
 	}
 	
 	private func writeEsc(_ s: String) {
@@ -272,17 +321,6 @@ public final class Console {
 	}
 	
 	// MARK: Truecolor detection + RGB→256 fallback
-	
-	private static func detectTrueColor() -> Bool {
-		if let forced = ProcessInfo.processInfo.environment["SWIFTERMINALKIT_TRUECOLOR"] {
-			if forced == "0" { return false }
-			if forced == "1" { return true }
-		}
-		if let colorterm = ProcessInfo.processInfo.environment["COLORTERM"]?.lowercased() {
-			if colorterm.contains("truecolor") || colorterm.contains("24bit") { return true }
-		}
-		return false
-	}
 	
 	private func rgbToXtermIndex(_ r: UInt8, _ g: UInt8, _ b: UInt8) -> Int {
 		@inline(__always) func to6(_ v: UInt8) -> Int {
@@ -323,6 +361,38 @@ public final class Console {
 		parser.feed(buf[0..<n])
 		return parser.nextEvent()
 	}
+}
+
+
+
+private extension Console {
+    static func shouldLogCaps(env: [String: String]) -> Bool {
+        guard let raw = env["SWIFTERMINALKIT_DEBUG_CAPS"] else { return false }
+        let value = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return value == "1" || value == "true" || value == "yes" || value == "on"
+    }
+
+    static func buildCapsDebugLine(for caps: TerminalCaps, env: [String: String]) -> String? {
+        var parts: [String] = []
+        parts.append("color=" + caps.color.rawValue)
+        parts.append("altScreen=" + String(caps.supportsAltScreen))
+        parts.append("mouse=" + String(caps.supportsMouse))
+        parts.append("bracketedPaste=" + String(caps.supportsBracketedPaste))
+        parts.append("focusEvents=" + String(caps.supportsFocusEvents))
+        let base = parts.joined(separator: " ")
+
+        var envParts: [String] = []
+        if let term = env["TERM"], !term.isEmpty { envParts.append("TERM=" + term) }
+        if let termProgram = env["TERM_PROGRAM"], !termProgram.isEmpty { envParts.append("TERM_PROGRAM=" + termProgram) }
+        if let colorterm = env["COLORTERM"], !colorterm.isEmpty { envParts.append("COLORTERM=" + colorterm) }
+        let envSummary = envParts.joined(separator: " ")
+
+        if envSummary.isEmpty {
+            return "[SwiftTerminalKit] caps " + base
+        } else {
+            return "[SwiftTerminalKit] caps " + base + " (" + envSummary + ")"
+        }
+    }
 }
 
 // MARK: - Extensions at file scope

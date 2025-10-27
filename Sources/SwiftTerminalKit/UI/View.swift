@@ -24,8 +24,18 @@ open class View {
 	public var zIndex: Int
 	
 	/// Default colors for this view's drawing.
-	public var fg: Console.PaletteColor = .default
-	public var bg: Console.PaletteColor = .default
+	public var foregroundColor: Console.PaletteColor = .default
+	public var backgroundColor: Console.PaletteColor = .default
+	
+	public var fg: Console.PaletteColor {
+		get { foregroundColor }
+		set { foregroundColor = newValue }
+	}
+	
+	public var bg: Console.PaletteColor {
+		get { backgroundColor }
+		set { backgroundColor = newValue }
+	}
 	
 	/// Whether the view can receive focus.
 	public var isFocusable: Bool = false
@@ -35,6 +45,10 @@ open class View {
 	
 	/// How the view should draw its border (if any).
 	public var borderStyle: BorderStyle = .none
+
+    public private(set) weak var superview: View?
+    private(set) var subviews: [View] = []
+
 	
 	/// Accumulated invalid region (screen coords).
 	private var pending = Region()
@@ -44,6 +58,13 @@ open class View {
 		self.zIndex = zIndex
 		invalidate() // start dirty
 	}
+
+    public func addSubview(_ view: View) {
+        subviews.append(view)
+        view.superview = self
+        invalidate(view.frame)
+    }
+
 	
 	/// Mark the whole view (or a specific rect) as needing repaint.
 	public func invalidate(_ r: Rect? = nil) {
@@ -63,6 +84,13 @@ open class View {
 	/// Default drawing: fill background. Subclasses override to draw content.
 	open func draw(into surface: Surface, clip: Rect) {
 		surface.fill(clip, cell: .init(" ", fg: fg, bg: bg))
+
+        for subview in subviews {
+            let subviewClip = clip.intersection(subview.frame)
+            if !subviewClip.isEmpty {
+                subview.draw(into: surface, clip: subviewClip)
+            }
+        }
 	}
 	
 	/// Hit-testing helper.

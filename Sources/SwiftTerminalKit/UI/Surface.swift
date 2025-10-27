@@ -3,10 +3,27 @@ import Foundation
 public final class Surface {
 	public struct Cell {
 		public var ch: String
-		public var fg: Console.PaletteColor
-		public var bg: Console.PaletteColor
-		public init(_ ch: String = " ", fg: Console.PaletteColor = .default, bg: Console.PaletteColor = .default) {
-			self.ch = ch; self.fg = fg; self.bg = bg
+		
+		public var foregroundColor: Console.PaletteColor
+		public var backgroundColor: Console.PaletteColor
+		
+		public var fg: Console.PaletteColor {
+			get { foregroundColor }
+			set { foregroundColor = newValue }
+		}
+		
+		public var bg: Console.PaletteColor {
+			get { backgroundColor }
+			set { backgroundColor = newValue }
+		}
+
+		
+		public init(_ ch: String = " ", foregroundColor: Console.PaletteColor = .default, backgroundColor: Console.PaletteColor = .default) {
+			self.ch = ch; self.foregroundColor = foregroundColor; self.backgroundColor = backgroundColor
+		}
+		
+		public init(_ ch: String = " ", fg: Console.PaletteColor, bg: Console.PaletteColor) {
+			self.init(ch, foregroundColor: fg, backgroundColor: bg)
 		}
 	}
 	
