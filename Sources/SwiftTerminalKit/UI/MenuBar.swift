@@ -33,13 +33,13 @@ public class MenuBar: View {
     }
 
     public override func draw(into surface: Surface, clip: Rect) {
-        surface.fill(clip, cell: .init(" ", fg: foregroundColor, bg: backgroundColor))
+        let topRow = Rect(frame.x, frame.y, frame.w, 1).intersection(clip)
+        if !topRow.isEmpty {
+            surface.fill(topRow, cell: .init(" ", fg: foregroundColor, bg: backgroundColor))
+        }
 
         for item in menuItems {
-            let itemClip = clip
-            if !itemClip.isEmpty {
-                item.draw(into: surface, clip: itemClip)
-            }
+            item.draw(into: surface, clip: clip)
         }
     }
 

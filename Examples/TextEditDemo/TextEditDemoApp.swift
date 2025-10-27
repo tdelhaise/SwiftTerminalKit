@@ -49,13 +49,14 @@ final class TextEditDemoApp: Application, MenuCommandDelegate {
 
         editor = EditorView(frame: Rect(0, 1, size.cols, size.rows - 2), zIndex: 0)
         editor.borderTitle = " SwiftTerminalKit TextEdit "
-        editor.statusHint = " Ctrl+S Save  Ctrl+Q Quit "
+        editor.statusHint = "Ctrl+S Save  Ctrl+Q Quit"
         editor.foregroundColor = theme.editorForeground
         editor.backgroundColor = theme.editorBackground
 
         statusLine = StatusLine(width: size.cols)
         statusLine.frame = Rect(0, size.rows - 1, size.cols, 1)
         statusLine.zIndex = 20
+        statusLine.setPersistentPrefix("F10 Menu  | ")
 
         screen.addView(editor)
         screen.addView(menuBar)
@@ -63,6 +64,7 @@ final class TextEditDemoApp: Application, MenuCommandDelegate {
         screen.setFocus(editor)
 
         applyTheme()
+        updateDefaultStatusMessage()
         restoreDefaultStatus()
         statusLine.updateCursorInfo(line: editor.cursorY + 1, col: editor.cursorX + 1)
     }
@@ -302,6 +304,18 @@ final class TextEditDemoApp: Application, MenuCommandDelegate {
 
     // MARK: - Helpers
 
+    private func updateDefaultStatusMessage() {
+        var parts: [String] = []
+        let hint = editor?.statusHint.trimmingCharacters(in: .whitespaces)
+        if let hint, !hint.isEmpty {
+            parts.append(hint)
+        }
+        if let summary = console.capabilitySummary, !summary.isEmpty {
+            parts.append(summary)
+        }
+        defaultStatusMessage = parts.isEmpty ? "Ready" : parts.joined(separator: "  •  ")
+    }
+
     private func layoutForSize(cols: Int, rows: Int) {
         editor.frame = Rect(0, 1, cols, max(0, rows - 2))
         statusLine.frame = Rect(0, rows - 1, cols, 1)
@@ -348,7 +362,7 @@ final class TextEditDemoApp: Application, MenuCommandDelegate {
         editor.foregroundColor = theme.editorForeground
         editor.backgroundColor = theme.editorBackground
         editor.borderTitle = " SwiftTerminalKit TextEdit "
-        editor.statusHint = " Ctrl+S Save  Ctrl+Q Quit "
+        editor.statusHint = "Ctrl+S Save  Ctrl+Q Quit"
         editor.invalidate()
 
         menuBar.foregroundColor = theme.menuForeground
@@ -386,6 +400,7 @@ final class TextEditDemoApp: Application, MenuCommandDelegate {
     }
 
     private func menuBarHeight(forDropDownCount count: Int) -> Int {
-        return max(1, min(screen.size.rows, count + 1))
+        if count <= 0 { return 1 }
+        return min(screen.size.rows, count + 3)
     }
 }

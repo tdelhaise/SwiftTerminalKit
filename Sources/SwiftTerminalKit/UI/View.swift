@@ -95,4 +95,7 @@ open class View {
 	
 	/// Hit-testing helper.
 	public func hitTest(x: Int, y: Int) -> Bool { frame.contains(x, y) }
+
+	/// Override to provide the caret location (0-based screen coordinates) when this view wants the text cursor visible.
+	open func cursorPosition() -> (x: Int, y: Int)? { nil }
 }

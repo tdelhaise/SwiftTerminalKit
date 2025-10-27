@@ -77,10 +77,21 @@ public final class Screen {
 				if !clip.isEmpty { v.draw(into: surface, clip: clip) }
 			}
 		}
-		
-		console.hideCursor(true)
+        let caret = focusedView?.cursorPosition()
+        if caret == nil {
+            console.hideCursor(true)
+        }
+
 		surface.present(to: console, only: damage.rects)
-		console.hideCursor(false)
+
+        if let caret {
+            let x = max(0, min(surface.width - 1, caret.x)) + 1
+            let y = max(0, min(surface.height - 1, caret.y)) + 1
+            console.moveTo(x: x, y: y)
+            console.hideCursor(false)
+        } else {
+            console.hideCursor(true)
+        }
 	}
 	
 	private func sortViews() { views.sort { $0.zIndex < $1.zIndex } }
