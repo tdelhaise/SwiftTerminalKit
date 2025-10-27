@@ -12,8 +12,10 @@ import Foundation
 public class MenuBar: View {
     private var menuItems: [MenuView]
     private var activeIndex: Int? = nil
+    private var dropDownOpen: Bool = false
     
     public var isActive: Bool { activeIndex != nil }
+    public var isDropDownOpen: Bool { dropDownOpen }
 
     public var delegate: MenuCommandDelegate? // The view that will handle menu commands
 
@@ -31,18 +33,18 @@ public class MenuBar: View {
     }
 
     public override func draw(into surface: Surface, clip: Rect) {
-        // Draw background for the entire menu bar
-		let topRect = Rect(frame.x, frame.y, frame.w, 1)
-		let fillRect = topRect.intersection(clip)
-		if !fillRect.isEmpty {
-			surface.fill(fillRect, cell: .init(" ", fg: foregroundColor, bg: backgroundColor))
-		}
+        surface.fill(clip, cell: .init(" ", fg: foregroundColor, bg: backgroundColor))
 
-        // Draw each menu item
-        super.draw(into: surface, clip: clip)
+        for item in menuItems {
+            let itemClip = clip
+            if !itemClip.isEmpty {
+                item.draw(into: surface, clip: itemClip)
+            }
+        }
     }
 
-    public func activate(at index: Int? = nil) -> MenuView? {
+    @discardableResult
+    public func activate(at index: Int? = nil, openDropDown: Bool = false) -> MenuView? {
         guard !menuItems.isEmpty else { return nil }
         let resolved = index ?? activeIndex ?? 0
         let clamped = (resolved >= 0 && resolved < menuItems.count) ? resolved : 0
@@ -51,15 +53,13 @@ public class MenuBar: View {
         for (i, item) in menuItems.enumerated() where i != clamped {
             item.clearSelection()
         }
-        if menu.hasDropDown {
-            _ = menu.focusFirstItem()
-        } else {
-            menu.clearSelection()
-        }
+        dropDownOpen = openDropDown && menu.hasDropDown
+        applyDropDownState(to: menu)
         return menu
     }
     
     public func deactivate() {
+        dropDownOpen = false
         activeIndex = nil
         for menu in menuItems { menu.clearSelection() }
     }
@@ -69,28 +69,20 @@ public class MenuBar: View {
         return menuItems[idx]
     }
     
-    public func focusNext() -> MenuView? {
-        if let menu = moveSelection(by: 1) {
-            if menu.hasDropDown {
-                _ = menu.focusFirstItem()
-            } else {
-                menu.clearSelection()
-            }
-            return menu
-        }
-        return nil
+    @discardableResult
+    public func focusNext(openDropDown: Bool? = nil) -> MenuView? {
+        guard let menu = moveSelection(by: 1) else { return nil }
+        if let open = openDropDown { dropDownOpen = open }
+        applyDropDownState(to: menu)
+        return menu
     }
 
-    public func focusPrevious() -> MenuView? {
-        if let menu = moveSelection(by: -1) {
-            if menu.hasDropDown {
-                _ = menu.focusFirstItem()
-            } else {
-                menu.clearSelection()
-            }
-            return menu
-        }
-        return nil
+    @discardableResult
+    public func focusPrevious(openDropDown: Bool? = nil) -> MenuView? {
+        guard let menu = moveSelection(by: -1) else { return nil }
+        if let open = openDropDown { dropDownOpen = open }
+        applyDropDownState(to: menu)
+        return menu
     }
     
     public func menu(mnemonic: Character) -> (index: Int, menu: MenuView)? {
@@ -102,6 +94,22 @@ public class MenuBar: View {
             }
         }
         return nil
+    }
+
+    @discardableResult
+    public func openCurrentDropDown() -> MenuView? {
+        guard let menu = currentMenu(), menu.hasDropDown else {
+            dropDownOpen = false
+            return nil
+        }
+        dropDownOpen = true
+        _ = menu.focusFirstItem()
+        return menu
+    }
+
+    public func closeCurrentDropDown() {
+        dropDownOpen = false
+        currentMenu()?.clearSelection()
     }
     
     private func moveSelection(by delta: Int) -> MenuView? {
@@ -115,5 +123,14 @@ public class MenuBar: View {
         }
         menu.clearSelection()
         return menu
+    }
+
+    private func applyDropDownState(to menu: MenuView) {
+        if dropDownOpen && menu.hasDropDown {
+            _ = menu.focusFirstItem()
+        } else {
+            dropDownOpen = dropDownOpen && menu.hasDropDown
+            menu.clearSelection()
+        }
     }
 }
