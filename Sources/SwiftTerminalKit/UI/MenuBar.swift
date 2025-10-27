@@ -32,7 +32,11 @@ public class MenuBar: View {
 
     public override func draw(into surface: Surface, clip: Rect) {
         // Draw background for the entire menu bar
-		surface.fill(frame, cell: .init(" ", fg: foregroundColor, bg: backgroundColor))
+		let topRect = Rect(frame.x, frame.y, frame.w, 1)
+		let fillRect = topRect.intersection(clip)
+		if !fillRect.isEmpty {
+			surface.fill(fillRect, cell: .init(" ", fg: foregroundColor, bg: backgroundColor))
+		}
 
         // Draw each menu item
         super.draw(into: surface, clip: clip)
@@ -44,7 +48,14 @@ public class MenuBar: View {
         let clamped = (resolved >= 0 && resolved < menuItems.count) ? resolved : 0
         activeIndex = clamped
         let menu = menuItems[clamped]
-        menu.resetSelection()
+        for (i, item) in menuItems.enumerated() where i != clamped {
+            item.clearSelection()
+        }
+        if menu.hasDropDown {
+            _ = menu.focusFirstItem()
+        } else {
+            menu.clearSelection()
+        }
         return menu
     }
     
@@ -59,11 +70,27 @@ public class MenuBar: View {
     }
     
     public func focusNext() -> MenuView? {
-        return moveSelection(by: 1)
+        if let menu = moveSelection(by: 1) {
+            if menu.hasDropDown {
+                _ = menu.focusFirstItem()
+            } else {
+                menu.clearSelection()
+            }
+            return menu
+        }
+        return nil
     }
-    
+
     public func focusPrevious() -> MenuView? {
-        return moveSelection(by: -1)
+        if let menu = moveSelection(by: -1) {
+            if menu.hasDropDown {
+                _ = menu.focusFirstItem()
+            } else {
+                menu.clearSelection()
+            }
+            return menu
+        }
+        return nil
     }
     
     public func menu(mnemonic: Character) -> (index: Int, menu: MenuView)? {
@@ -83,6 +110,9 @@ public class MenuBar: View {
         let next = (idx + delta + count) % count
         activeIndex = next
         let menu = menuItems[next]
+        for (i, item) in menuItems.enumerated() where i != next {
+            item.clearSelection()
+        }
         menu.clearSelection()
         return menu
     }

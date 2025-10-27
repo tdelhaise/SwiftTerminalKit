@@ -40,6 +40,24 @@ final class VTParserTests: XCTestCase {
 		}
 		XCTAssertEqual(key, .function(5))
 	}
+
+	func testFunctionKeyF10Variants() {
+		let plain: [UInt8] = [0x1B, 0x5B] + Array("21~".utf8)
+		let shifted: [UInt8] = [0x1B, 0x5B] + Array("21;2~".utf8)
+		let controls: [[UInt8]] = [plain, shifted]
+		for seq in controls {
+			let events = events(from: seq)
+			guard case .key(let key, let mods) = events.first else {
+				return XCTFail("Expected key event for sequence \(seq)")
+			}
+			XCTAssertEqual(key, .function(10))
+			if seq == shifted {
+				XCTAssertTrue(mods.contains(.shift))
+			} else {
+				XCTAssertTrue(mods.isEmpty)
+			}
+		}
+	}
 	
 	func testFunctionKeyFromSS3() {
 		let sequence: [UInt8] = [0x1B, 0x4F, 0x50] // ESC O P => F1

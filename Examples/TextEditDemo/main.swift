@@ -227,6 +227,9 @@ do {
     let screen = Screen(console: console)
 
     let app = TextEditApp(console: console, screen: screen)
+    console.statusHook = { message in
+        app.statusLine.updateMessage(message)
+    }
 
     let loop = STKRunLoop(console: console, screen: screen)
 

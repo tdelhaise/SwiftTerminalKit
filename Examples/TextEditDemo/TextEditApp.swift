@@ -40,6 +40,7 @@ class TextEditApp: View, MenuCommandDelegate {
     let menuBar: MenuBar
     let statusLine: StatusLine
     private let topMenus: [MenuView]
+    private var defaultStatusMessage: String
 
     var console: Console
     var screen: Screen
@@ -73,10 +74,11 @@ class TextEditApp: View, MenuCommandDelegate {
         ])
         self.topMenus = [fileMenu, editMenu, searchMenu]
         self.menuBar = MenuBar(menuItems: topMenus)
-        self.menuBar.frame = Rect(0, 0, console.size.cols, 1)
+        self.menuBar.frame = Rect(0, 0, console.size.cols, console.size.rows)
 
         self.statusLine = StatusLine(width: console.size.cols)
         statusLine.frame = Rect(0, console.size.rows - 1, console.size.cols, 1)
+        self.defaultStatusMessage = console.capabilitySummary ?? "Ready"
 
         super.init(frame: Rect(0, 0, console.size.cols, console.size.rows))
 
@@ -85,6 +87,9 @@ class TextEditApp: View, MenuCommandDelegate {
         addSubview(menuBar)
         addSubview(editor)
         addSubview(statusLine)
+
+        statusLine.updateMessage(defaultStatusMessage)
+        statusLine.updateCursorInfo(line: editor.cy + 1, col: editor.cx + 1)
 
         applyTheme()
 
@@ -126,6 +131,10 @@ class TextEditApp: View, MenuCommandDelegate {
                 break
             }
 
+            if case .function(let num) = k.keyCode {
+                statusLine.updateMessage("F\(num)")
+            }
+
             if k.mods.contains(.ctrl) {
                 if case .char(let ch) = k.keyCode {
                     if ch == "q" || ch == "Q" {
@@ -165,7 +174,7 @@ class TextEditApp: View, MenuCommandDelegate {
         frame = Rect(0, 0, cols, rows)
         editor.frame = Rect(0, 1, cols, rows - 2)
         statusLine.frame = Rect(0, rows - 1, cols, 1)
-        menuBar.frame = Rect(0, 0, cols, 1)
+        menuBar.frame = Rect(0, 0, cols, rows)
         editor.invalidate()
         menuBar.invalidate()
         statusLine.invalidate()
@@ -189,7 +198,7 @@ class TextEditApp: View, MenuCommandDelegate {
 
         statusLine.foregroundColor = theme.statusForeground
         statusLine.backgroundColor = theme.statusBackground
-        statusLine.updateMessage("Ready")
+        statusLine.updateMessage(defaultStatusMessage)
         statusLine.updateCursorInfo(line: editor.cy + 1, col: editor.cx + 1)
         statusLine.invalidate()
     }
@@ -223,16 +232,16 @@ class TextEditApp: View, MenuCommandDelegate {
         case .left:
             if let next = menuBar.focusPrevious() {
                 editor.invalidate()
-                next.clearSelection()
                 screen.setFocus(next)
+                next.invalidate()
                 updateStatus(for: next)
             }
             return .handledContinue
         case .right:
             if let next = menuBar.focusNext() {
                 editor.invalidate()
-                next.clearSelection()
                 screen.setFocus(next)
+                next.invalidate()
                 updateStatus(for: next)
             }
             return .handledContinue
@@ -241,20 +250,21 @@ class TextEditApp: View, MenuCommandDelegate {
             return .handledContinue
         case .down:
             if let menu = menuBar.currentMenu() {
-                if menu.ensureSelection() {
+                let updated: Bool
+                if menu.currentSubItem() == nil {
+                    updated = menu.focusFirstItem()
+                } else {
+                    updated = menu.adjustSelection(by: 1)
+                }
+                if updated {
                     menu.invalidate()
                     editor.invalidate()
                     updateStatus(for: menu)
-                    return .handledContinue
-                } else {
-                    let keepRunning = triggerCurrentMenu()
-                    deactivateMenuBar(restoreReadyMessage: keepRunning)
-                    return keepRunning ? .handledContinue : .handledStop
                 }
             }
             return .handledContinue
         case .up:
-            if let menu = menuBar.currentMenu(), menu.moveSelection(delta: -1) {
+            if let menu = menuBar.currentMenu(), menu.adjustSelection(by: -1) {
                 menu.invalidate()
                 editor.invalidate()
                 updateStatus(for: menu)
@@ -269,6 +279,7 @@ class TextEditApp: View, MenuCommandDelegate {
                 editor.invalidate()
                 _ = menuBar.activate(at: index)
                 screen.setFocus(menu)
+                menu.invalidate()
                 updateStatus(for: menu)
             }
             return .handledContinue
@@ -293,7 +304,7 @@ class TextEditApp: View, MenuCommandDelegate {
         screen.setFocus(editor)
         statusLine.updateCursorInfo(line: editor.cy + 1, col: editor.cx + 1)
         if restoreReadyMessage {
-            statusLine.updateMessage("Ready")
+            statusLine.updateMessage(defaultStatusMessage)
         }
     }
 

@@ -42,7 +42,7 @@ Perform each action and confirm the editor reacts (cursor movement, menus, etc.)
 - Shift+Tab (should move focus backwards in menu/dialog contexts).
 - Enter / Return.
 - Esc (menu dismiss or app-level handling).
-- F10 toggles the menu bar; Alt+F, Alt+E, Alt+S jump to File/Edit/Search while active.
+- F10 toggles the menu bar; Alt+F/Alt+E/Alt+S jump to File/Edit/Search. Use the Down/Up arrows to move inside the drop-down and Enter to invoke the highlighted item.
 
 ## 4. Bracketed Paste
 

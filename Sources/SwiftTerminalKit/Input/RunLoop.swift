@@ -15,6 +15,7 @@ public final class STKRunLoop {
 	@discardableResult
 	public func runSync(pollMs: Int = 50, handle: (InputEvent) -> Bool) -> Int {
 		var frames = 0
+		screen.render()
 		while true {
 			if let ev = queue.nextEvent(timeoutMs: pollMs) {
 				let keep = handle(ev)

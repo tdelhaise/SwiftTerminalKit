@@ -70,7 +70,6 @@ public final class Console {
 	private var focusEventsActive = false
 	private let capsDebugEnabled: Bool
 	private let capsDebugLine: String?
-	private var capsDebugPrinted = false
 	
 	public init() throws {
 #if os(Windows)
@@ -115,10 +114,8 @@ public final class Console {
 		}
 		clear()
 		present()
-		if capsDebugEnabled, !capsDebugPrinted, let line = capsDebugLine,
-		   let data = (line + "\n").data(using: .utf8) {
-			FileHandle.standardError.write(data)
-			capsDebugPrinted = true
+		if let line = capabilitySummary {
+			statusHook?(line)
 		}
 	}
 	
@@ -130,11 +127,6 @@ public final class Console {
 		showCursor(true)
 		if altScreenActive { leaveAltScreen() }
 		io.restoreMode()
-		if capsDebugEnabled, !capsDebugPrinted, let line = capsDebugLine,
-		   let data = (line + "\n").data(using: .utf8) {
-			FileHandle.standardError.write(data)
-			capsDebugPrinted = true
-		}
 		isShutdown = true
 	}
 	
@@ -314,6 +306,14 @@ public final class Console {
 	public func enableFocusEvents(_ on: Bool) {
 		writeEsc(on ? "[?1004h" : "[?1004l")
 		focusEventsActive = on
+	}
+	
+	// Hook used by demos to consume startup messages instead of stderr.
+	public var statusHook: ((String) -> Void)?
+	
+	public var capabilitySummary: String? {
+		guard capsDebugEnabled, let line = capsDebugLine else { return nil }
+		return line
 	}
 	
 	private func writeEsc(_ s: String) {

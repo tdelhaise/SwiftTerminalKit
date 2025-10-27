@@ -63,24 +63,20 @@ public class MenuView: View {
 		}
 	    }
 
-	public func resetSelection() {
-		selectedSubIndex = hasDropDown ? 0 : nil
-	}
-
 	public func clearSelection() {
 		selectedSubIndex = nil
 	}
 
-	public func ensureSelection() -> Bool {
-		guard hasDropDown else {
+	public func focusFirstItem() -> Bool {
+		guard let entries = subMenu, !entries.isEmpty else {
 			selectedSubIndex = nil
 			return false
 		}
-		if selectedSubIndex == nil { selectedSubIndex = 0 }
+		selectedSubIndex = 0
 		return true
 	}
 
-	public func moveSelection(delta: Int) -> Bool {
+	public func adjustSelection(by delta: Int, wrap: Bool = true) -> Bool {
 		guard let entries = subMenu, !entries.isEmpty else {
 			selectedSubIndex = nil
 			return false
@@ -88,8 +84,12 @@ public class MenuView: View {
 		let count = entries.count
 		if count == 0 { return false }
 		let current = selectedSubIndex ?? 0
-		var next = (current + delta) % count
-		if next < 0 { next += count }
+		var next = current + delta
+		if wrap {
+			next = (next % count + count) % count
+		} else {
+			next = min(max(next, 0), count - 1)
+		}
 		selectedSubIndex = next
 		return true
 	}
@@ -118,8 +118,13 @@ public class MenuView: View {
 			let fg = isSelected ? highlightFG : normalFG
 			let bg = isSelected ? highlightBG : normalBG
 			let padded = " " + entry.title.padding(toLength: dropWidth - 2, withPad: " ", startingAt: 0) + " "
-			surface.fill(Rect(baseX, y, dropWidth, 1), cell: .init(" ", fg: fg, bg: bg))
-			surface.putString(x: baseX, y: y, text: padded, fg: fg, bg: bg)
+			let rowRect = Rect(baseX, y, dropWidth, 1)
+			let intersect = rowRect.intersection(clip)
+			if !intersect.isEmpty {
+				surface.fill(intersect, cell: .init(" ", fg: fg, bg: bg))
+				let visibleText = String(padded.prefix(intersect.w))
+				surface.putString(x: intersect.x, y: intersect.y, text: visibleText, fg: fg, bg: bg)
+			}
 		}
 	}
 }
