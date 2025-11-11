@@ -5,6 +5,11 @@ final class VTParser {
 	private var buffer: [UInt8] = []
 	private var eventQueue: [Event] = []
 	
+	// Sequence timeout tracking: if a sequence starts but doesn't complete within this duration,
+	// discard it to avoid blocking on malformed input (especially with rapid keypresses)
+	private var sequenceStartTime: Date? = nil
+	private let sequenceTimeoutMs: Int = 100
+	
 	func feed(_ slice: ArraySlice<UInt8>) {
 		buffer.append(contentsOf: slice)
 		parse()
@@ -23,9 +28,26 @@ final class VTParser {
 				if result.consumed > 0 {
 					buffer.removeFirst(result.consumed)
 				} else {
-					buffer.removeAll()
+					buffer.removeAll(keepingCapacity: true)
 				}
+				sequenceStartTime = nil  // Reset timeout on successful parse
 			} else {
+				// Incomplete sequence detected
+				// Check if this is an incomplete escape sequence with timeout
+				if buffer.count > 0 && buffer[0] == 0x1B {
+					if sequenceStartTime == nil {
+						sequenceStartTime = Date()
+					} else if let start = sequenceStartTime {
+						let elapsedMs = Int(Date().timeIntervalSince(start) * 1000)
+						if elapsedMs > sequenceTimeoutMs {
+							// Timeout: discard incomplete escape sequence and treat ESC as key
+							buffer.removeFirst()
+							eventQueue.append(.key(.esc, []))
+							sequenceStartTime = nil
+							continue
+						}
+					}
+				}
 				break
 			}
 		}
@@ -117,8 +139,10 @@ final class VTParser {
 				return (.key(.function(10), modifiersFrom(params: params)), consumed)
 			case UInt8(ascii: "F"):
 				return (.key(.end, modifiersFrom(params: params)), consumed)
-			case UInt8(ascii: "F"):
-				return (.key(.end, modifiersFrom(params: params)), consumed)
+			case UInt8(ascii: "3"):
+				// Handle Delete key (commonly mapped to CSI 3 ~)
+				let mods = params.count >= 2 ? modifiersFrom(value: params[1]) : []
+				return (.key(.deleteKey, mods), consumed)
 			case UInt8(ascii: "H"):
 				return (.key(.home, modifiersFrom(params: params)), consumed)
 			case UInt8(ascii: "Z"):
@@ -210,23 +234,46 @@ final class VTParser {
 		guard let first = bytes.first else { return nil }
 		
 		if first < 0x80 {
+			// Single-byte ASCII character
 			return (Character(UnicodeScalar(first)), 1)
 		}
 		
+		// Multi-byte UTF-8 sequence validation
 		let expectedLength: Int
 		switch first {
 			case 0xC0...0xDF: expectedLength = 2
 			case 0xE0...0xEF: expectedLength = 3
 			case 0xF0...0xF7: expectedLength = 4
 			default:
+				// Invalid UTF-8 start byte (e.g., 0x80-0xBF or 0xF8-0xFF)
+				// This is a continuation byte without a start byte, or invalid sequence
+				// Skip this single byte to avoid getting stuck
 				return nil
 		}
 		
-		guard bytes.count >= expectedLength else { return nil }
+		// Check if we have enough bytes for the full sequence
+		guard bytes.count >= expectedLength else {
+			// Incomplete multi-byte sequence; wait for more data
+			return nil
+		}
+		
+		// Validate continuation bytes (must be 0x80-0xBF)
+		for i in 1..<expectedLength {
+			let byte = bytes[i]
+			if (byte & 0xC0) != 0x80 {
+				// Invalid continuation byte detected
+				// Return nil to signal incomplete/malformed sequence
+				// Don't consume the byte; let parent handle timeout/discard
+				return nil
+			}
+		}
+		
+		// All validation passed; decode the sequence
 		let slice = Array(bytes[0..<expectedLength])
 		if let str = String(bytes: slice, encoding: .utf8), let ch = str.first {
 			return (ch, expectedLength)
 		}
+		// Decoding failed despite passing validation; very rare
 		return nil
 	}
 	
