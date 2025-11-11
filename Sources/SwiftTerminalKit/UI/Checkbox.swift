@@ -11,7 +11,16 @@ import Foundation
 /// A checkbox view.
 public class Checkbox: View {
     private var label: Label
-    public var isChecked: Bool
+    public var isChecked: Bool {
+        didSet {
+            if isChecked != oldValue {
+                invalidate()
+                onToggle?(isChecked)
+            }
+        }
+    }
+    
+    public var onToggle: ((Bool) -> Void)?
 
     /// Initializes a new checkbox with the specified text and initial state.
     /// - Parameters:
@@ -38,8 +47,17 @@ public class Checkbox: View {
         }
     }
 
+    public func handle(event: KeyEvent) -> Bool {
+        switch event.keyCode {
+        case .char(" "), .enter:
+            toggle()
+            return true
+        default:
+            return false
+        }
+    }
+
     public func toggle() {
         isChecked.toggle()
-        invalidate()
     }
 }

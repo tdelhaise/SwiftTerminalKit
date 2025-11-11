@@ -285,17 +285,95 @@ final class TextEditDemoApp: Application, MenuCommandDelegate {
 
     func handleMenuCommand(_ commandId: Int) -> Bool {
         switch commandId {
-        case 1: showStatus("New (not implemented)")
-        case 2: showStatus("Open (not implemented)")
-        case 3: do { try saveEditor(); showStatus("File saved.", permanent: true) } catch { showStatus("Save failed: \(error.localizedDescription)") }
-        case 4: showStatus("Save As (not implemented)")
-        case 5: requestExit(); return false
+        case 1:
+            // New
+            editor.load(text: "")
+            showStatus("New document", permanent: true)
+            return true
+
+        case 2:
+            // Open
+            let size = screen.size
+            let dlgFrame = Rect((size.cols - 50) / 2, (size.rows - 12) / 2, 50, 12)
+            let openDialog = FileOpenDialog(frame: dlgFrame, path: ".")
+            openDialog.present(on: screen) { [weak self] url in
+                guard let self = self else { return }
+                self.screen.removeView(openDialog)
+                self.screen.setFocus(self.editor)
+                
+                if let url = url {
+                    do {
+                        let content = try String(contentsOf: url, encoding: .utf8)
+                        self.editor.load(text: content)
+                        self.showStatus("Opened: \(url.lastPathComponent)", permanent: true)
+                    } catch {
+                        self.showStatus("Open failed: \(error.localizedDescription)")
+                    }
+                } else {
+                    self.restoreDefaultStatus()
+                }
+            }
+            return true
+
+        case 3:
+            // Save
+            do {
+                try saveEditor()
+                showStatus("File saved.", permanent: true)
+            } catch {
+                showStatus("Save failed: \(error.localizedDescription)")
+            }
+            return true
+
+        case 4:
+            // Save As
+            let size = screen.size
+            let dlgFrame = Rect((size.cols - 50) / 2, (size.rows - 10) / 2, 50, 10)
+            let saveDialog = FileSaveDialog(frame: dlgFrame, defaultName: "textedit.txt")
+            saveDialog.present(on: screen) { [weak self] url in
+                guard let self = self else { return }
+                self.screen.removeView(saveDialog)
+                self.screen.setFocus(self.editor)
+                
+                if let url = url {
+                    do {
+                        try self.editor.contents().write(to: url, atomically: true, encoding: .utf8)
+                        self.showStatus("Saved: \(url.lastPathComponent)", permanent: true)
+                    } catch {
+                        self.showStatus("Save failed: \(error.localizedDescription)")
+                    }
+                } else {
+                    self.restoreDefaultStatus()
+                }
+            }
+            return true
+
+        case 5:
+            requestExit()
+            return false
+
         case 6: showStatus("Cut (not implemented)")
         case 7: showStatus("Copy (not implemented)")
         case 8: showStatus("Paste (not implemented)")
         case 9: showStatus("Undo (not implemented)")
         case 10: showStatus("Redo (not implemented)")
-        case 11: showStatus("Find (not implemented)")
+
+        case 11:
+            // Find
+            let size = screen.size
+            let dlgFrame = Rect((size.cols - 40) / 2, (size.rows - 6) / 2, 40, 6)
+            let findDialog = Dialog(frame: dlgFrame, title: "Find")
+            let findInput = InputLine(x: dlgFrame.x + 1, y: dlgFrame.y + 2, width: dlgFrame.w - 2, text: "")
+            findDialog.addSubview(findInput)
+            
+            screen.addView(findDialog)
+            screen.setFocus(findInput)
+            findDialog.invalidate()
+            findInput.invalidate()
+            
+            showStatus("Find: Enter search term and press Enter", permanent: true)
+            return true
+
         case 12: showStatus("Replace (not implemented)")
         default: break
         }
