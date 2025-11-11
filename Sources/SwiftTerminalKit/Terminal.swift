@@ -353,6 +353,12 @@ public final class Console {
 			size = newSize
 			return .resize(cols: newSize.cols, rows: newSize.rows)
 		}
+		
+		// Check if parser has already-parsed events before blocking on I/O
+		if let event = parser.nextEvent() {
+			return event
+		}
+		
 		var buf = [UInt8](repeating: 0, count: 4096)
 		let n = io.read(into: &buf, timeoutMs: timeoutMs)
 		if n <= 0 {
