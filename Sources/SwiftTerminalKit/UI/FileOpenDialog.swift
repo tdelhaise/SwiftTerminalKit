@@ -10,10 +10,15 @@ import Foundation
 
 /// A modal dialog for selecting a file to open.
 public class FileOpenDialog: Dialog {
+    private enum FocusableElement {
+        case fileList, openButton, cancelButton
+    }
+
     private var fileList: [String] = []
     private var selectedIndex: Int = 0
     private var currentPath: String
     private var completion: ((URL?) -> Void)?
+    private var internalFocus: FocusableElement = .fileList
 
     /// Initializes a new file open dialog.
     /// - Parameters:
@@ -30,8 +35,6 @@ public class FileOpenDialog: Dialog {
         do {
             fileList = try FileManager.default.contentsOfDirectory(atPath: currentPath)
                 .sorted()
-                .prefix(frame.h - 4) // Leave room for title, status, buttons
-                .map { String($0) }
         } catch {
             fileList = []
         }
@@ -45,59 +48,96 @@ public class FileOpenDialog: Dialog {
         let innerX = frame.x + 1
         let innerY = frame.y + 2
         let innerW = frame.w - 2
-        let innerH = frame.h - 5
+        let listHeight = frame.h - 5
 
         // Draw file list
         for (index, file) in fileList.enumerated() {
-            if index >= innerH { break }
+            if index >= listHeight { break }
             let y = innerY + index
+            
             let isSelected = (index == selectedIndex)
+            let hasListFocus = (internalFocus == .fileList)
+            
+            var fg = foregroundColor
+            var bg = backgroundColor
+
+            if isSelected {
+                fg = hasListFocus ? backgroundColor : .gray(level: 18)
+                bg = hasListFocus ? foregroundColor : backgroundColor
+            }
+
             let displayText = String(file.prefix(innerW - 1).padding(toLength: innerW - 1, withPad: " ", startingAt: 0))
-            let fg = isSelected ? Console.PaletteColor.named(.black) : foregroundColor
-            let bg = isSelected ? Console.PaletteColor.named(.brightWhite) : backgroundColor
             surface.putString(x: innerX, y: y, text: displayText, fg: fg, bg: bg)
         }
 
         // Draw buttons
         let buttonY = frame.y + frame.h - 2
-        let openBtn = "[ Open ]"
-        let cancelBtn = "[ Cancel ]"
-        surface.putString(x: innerX, y: buttonY, text: openBtn, fg: foregroundColor, bg: backgroundColor)
-        surface.putString(x: innerX + innerW - cancelBtn.count, y: buttonY, text: cancelBtn, fg: foregroundColor, bg: backgroundColor)
+        let openBtnText = "[ Open ]"
+        let cancelBtnText = "[ Cancel ]"
+        
+        let isOpenFocused = (internalFocus == .openButton)
+        surface.putString(x: innerX, y: buttonY, text: openBtnText, 
+                          fg: isOpenFocused ? backgroundColor : foregroundColor, 
+                          bg: isOpenFocused ? foregroundColor : backgroundColor)
 
-        // Draw instructions
-        let instrY = frame.y + frame.h - 1
-        let instr = "↑↓ Select  Enter Open  Esc Cancel"
-        let instrClipped = String(instr.prefix(frame.w - 2).padding(toLength: frame.w - 2, withPad: " ", startingAt: 0))
-        surface.putString(x: innerX, y: instrY, text: instrClipped, fg: .gray(level: 12), bg: backgroundColor)
+        let isCancelFocused = (internalFocus == .cancelButton)
+        surface.putString(x: innerX + innerW - cancelBtnText.count, y: buttonY, text: cancelBtnText, 
+                          fg: isCancelFocused ? backgroundColor : foregroundColor, 
+                          bg: isCancelFocused ? foregroundColor : backgroundColor)
     }
 
-    public func handle(event: KeyEvent) -> Bool {
+    public override func handle(event: KeyEvent) -> Bool {
         switch event.keyCode {
+        case .tab:
+            if event.mods.contains(.shift) { // Shift+Tab, cycle backwards
+                switch internalFocus {
+                case .fileList: internalFocus = .cancelButton
+                case .openButton: internalFocus = .fileList
+                case .cancelButton: internalFocus = .openButton
+                }
+            } else { // Tab, cycle forwards
+                switch internalFocus {
+                case .fileList: internalFocus = .openButton
+                case .openButton: internalFocus = .cancelButton
+                case .cancelButton: internalFocus = .fileList
+                }
+            }
+            invalidate()
+            return true
+
         case .up:
-            if selectedIndex > 0 {
+            if internalFocus == .fileList, selectedIndex > 0 {
                 selectedIndex -= 1
                 invalidate()
             }
             return true
         case .down:
-            if selectedIndex < fileList.count - 1 {
+            if internalFocus == .fileList, selectedIndex < fileList.count - 1 {
                 selectedIndex += 1
                 invalidate()
             }
             return true
+
         case .enter:
-            if selectedIndex < fileList.count {
-                let selected = fileList[selectedIndex]
-                let fullPath = (currentPath as NSString).appendingPathComponent(selected)
-                completion?(URL(fileURLWithPath: fullPath))
+            switch internalFocus {
+            case .fileList, .openButton:
+                if selectedIndex < fileList.count {
+                    let selected = fileList[selectedIndex]
+                    let fullPath = (currentPath as NSString).appendingPathComponent(selected)
+                    completion?(URL(fileURLWithPath: fullPath))
+                }
+            case .cancelButton:
+                completion?(nil)
             }
             return true
+
         case .escape:
             completion?(nil)
             return true
+            
         default:
-            return false
+            // Consume all other keys to enforce modality
+            return true
         }
     }
 

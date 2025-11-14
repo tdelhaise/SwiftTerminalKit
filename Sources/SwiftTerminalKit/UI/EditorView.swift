@@ -100,8 +100,7 @@ public final class EditorView: View {
 		while y >= lines.count { lines.append([]) }
 	}
 	
-	public func handle(event: KeyEvent) -> Bool {
-		let mods = event.mods
+	    public override func handle(event: KeyEvent) -> Bool {		let mods = event.mods
 		switch event.keyCode {
 			case .char(let ch):
 				if mods.contains(.ctrl) || mods.contains(.meta) { return false }

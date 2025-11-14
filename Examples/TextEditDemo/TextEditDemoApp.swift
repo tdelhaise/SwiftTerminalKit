@@ -86,47 +86,49 @@ final class TextEditDemoApp: Application, MenuCommandDelegate {
         case .resize(let cols, let rows):
             layoutForSize(cols: cols, rows: rows)
             return true
-        case .key(let key):
-            switch processMenuKey(key) {
-            case .handledStop:
-                return false
-            case .handledContinue:
+        
+        case .key:
+            // Let the superclass dispatch to the focused view first.
+            if super.handle(event: event) {
+                // If the editor was the one that handled it, update the cursor.
+                if let focused = screen.focusedView, focused === editor {
+                    statusLine.updateCursorInfo(line: editor.cursorY + 1, col: editor.cursorX + 1)
+                    restoreDefaultStatus()
+                }
                 return true
-            case .notHandled:
-                break
             }
+            
+            // If not handled by a focused view, process menu/global shortcuts.
+            if case .key(let key) = event {
+                switch processMenuKey(key) {
+                case .handledStop:
+                    return false
+                case .handledContinue:
+                    return true
+                case .notHandled:
+                    break
+                }
 
-            if case .function(let num) = key.keyCode {
-                showStatus("F\(num)")
-            }
-
-            if key.mods.contains(.ctrl) {
-                if case .char(let ch) = key.keyCode {
-                    if ch == "q" || ch == "Q" {
-                        requestExit()
-                        return false
-                    }
-                    if ch == "s" || ch == "S" {
-                        do {
-                            try saveEditor()
-                            showStatus("File saved.", permanent: true)
-                        } catch {
-                            showStatus("Save failed: \(error.localizedDescription)")
+                if key.mods.contains(.ctrl) {
+                    if case .char(let ch) = key.keyCode {
+                        if ch == "q" || ch == "Q" {
+                            requestExit()
+                            return false
                         }
-                        return true
+                        if ch == "s" || ch == "S" {
+                            do {
+                                try saveEditor()
+                                showStatus("File saved.", permanent: true)
+                            } catch {
+                                showStatus("Save failed: \(error.localizedDescription)")
+                            }
+                            return true
+                        }
                     }
                 }
             }
-
-            if menuBar.isActive {
-                return true
-            }
-
-            if editor.handle(event: key) {
-                statusLine.updateCursorInfo(line: editor.cursorY + 1, col: editor.cursorX + 1)
-                restoreDefaultStatus()
-            }
             return true
+
         default:
             return true
         }
@@ -227,8 +229,22 @@ final class TextEditDemoApp: Application, MenuCommandDelegate {
                     return .handledContinue
                 }
             }
+            
             let keepRunning = triggerCurrentMenu()
-            deactivateMenuBar(restoreReadyMessage: keepRunning)
+
+            // If the menu command opened a dialog, it will now have focus.
+            // We must not reset the focus to the editor in that case.
+            if let focused = screen.focusedView, focused is Dialog {
+                // A dialog is active, just deactivate the menu's appearance
+                menuBar.deactivate()
+                menuBar.invalidate()
+                updateMenuBarFrame()
+                if keepRunning { restoreDefaultStatus() }
+            } else {
+                // No dialog, deactivate menu and return focus to editor
+                deactivateMenuBar(restoreReadyMessage: keepRunning)
+            }
+            
             return keepRunning ? .handledContinue : .handledStop
         case .char(let ch):
             if let (index, _) = menuBar.menu(mnemonic: ch) {
@@ -296,6 +312,8 @@ final class TextEditDemoApp: Application, MenuCommandDelegate {
             let size = screen.size
             let dlgFrame = Rect((size.cols - 50) / 2, (size.rows - 12) / 2, 50, 12)
             let openDialog = FileOpenDialog(frame: dlgFrame, path: ".")
+            openDialog.backgroundColor = theme.menuBackground
+            openDialog.foregroundColor = theme.menuForeground
             openDialog.present(on: screen) { [weak self] url in
                 guard let self = self else { return }
                 self.screen.removeView(openDialog)
@@ -330,6 +348,8 @@ final class TextEditDemoApp: Application, MenuCommandDelegate {
             let size = screen.size
             let dlgFrame = Rect((size.cols - 50) / 2, (size.rows - 10) / 2, 50, 10)
             let saveDialog = FileSaveDialog(frame: dlgFrame, defaultName: "textedit.txt")
+            saveDialog.backgroundColor = theme.menuBackground
+            saveDialog.foregroundColor = theme.menuForeground
             saveDialog.present(on: screen) { [weak self] url in
                 guard let self = self else { return }
                 self.screen.removeView(saveDialog)

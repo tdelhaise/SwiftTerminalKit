@@ -19,7 +19,16 @@ open class Application {
 
     open func setup() throws {}
     open func teardown() {}
-    open func handle(event: InputEvent) -> Bool { true }
+    open func handle(event: InputEvent) -> Bool {
+        // By default, pass key events to the focused view.
+        if case .key(let key) = event {
+            if let focused = screen.focusedView, focused.handle(event: key) {
+                return true // Event was handled by the focused view.
+            }
+        }
+        // Return false to indicate the event was not handled by the base implementation.
+        return false
+    }
     open func statusDidUpdate(_ message: String) {
         pendingStatusMessage = message
     }

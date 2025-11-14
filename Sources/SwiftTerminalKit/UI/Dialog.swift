@@ -37,25 +37,25 @@ public class Dialog: View {
         let borderRect = frame
         guard clip.intersects(borderRect) else { return }
 
-        // For now, we use simple characters for the border
-        let vertical = "|"
-        let horizontal = "-"
-        let topLeft = "+", topRight = "+", bottomLeft = "+", bottomRight = "+"
+        // Use box-drawing characters for a cleaner look
+        let vertical = "│"
+        let horizontal = "─"
+        let topLeft = "┌", topRight = "┐", bottomLeft = "└", bottomRight = "┘"
 
         // Draw corners
-        surface.putString(x: borderRect.x, y: borderRect.y, text: topLeft)
-        surface.putString(x: borderRect.x + borderRect.w - 1, y: borderRect.y, text: topRight)
-        surface.putString(x: borderRect.x, y: borderRect.y + borderRect.h - 1, text: bottomLeft)
-        surface.putString(x: borderRect.x + borderRect.w - 1, y: borderRect.y + borderRect.h - 1, text: bottomRight)
+        surface.putString(x: borderRect.x, y: borderRect.y, text: topLeft, fg: foregroundColor, bg: backgroundColor)
+        surface.putString(x: borderRect.x + borderRect.w - 1, y: borderRect.y, text: topRight, fg: foregroundColor, bg: backgroundColor)
+        surface.putString(x: borderRect.x, y: borderRect.y + borderRect.h - 1, text: bottomLeft, fg: foregroundColor, bg: backgroundColor)
+        surface.putString(x: borderRect.x + borderRect.w - 1, y: borderRect.y + borderRect.h - 1, text: bottomRight, fg: foregroundColor, bg: backgroundColor)
 
         // Draw sides
         for y in (borderRect.y + 1)..<(borderRect.y + borderRect.h - 1) {
-            surface.putString(x: borderRect.x, y: y, text: vertical)
-            surface.putString(x: borderRect.x + borderRect.w - 1, y: y, text: vertical)
+            surface.putString(x: borderRect.x, y: y, text: vertical, fg: foregroundColor, bg: backgroundColor)
+            surface.putString(x: borderRect.x + borderRect.w - 1, y: y, text: vertical, fg: foregroundColor, bg: backgroundColor)
         }
         for x in (borderRect.x + 1)..<(borderRect.x + borderRect.w - 1) {
-            surface.putString(x: x, y: borderRect.y, text: horizontal)
-            surface.putString(x: x, y: borderRect.y + borderRect.h - 1, text: horizontal)
+            surface.putString(x: x, y: borderRect.y, text: horizontal, fg: foregroundColor, bg: backgroundColor)
+            surface.putString(x: x, y: borderRect.y + borderRect.h - 1, text: horizontal, fg: foregroundColor, bg: backgroundColor)
         }
     }
 }

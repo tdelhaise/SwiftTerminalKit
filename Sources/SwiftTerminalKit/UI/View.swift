@@ -98,4 +98,7 @@ open class View {
 
 	/// Override to provide the caret location (0-based screen coordinates) when this view wants the text cursor visible.
 	open func cursorPosition() -> (x: Int, y: Int)? { nil }
+
+	/// Handles a key event. Returns true if the event was handled, false otherwise.
+	open func handle(event: KeyEvent) -> Bool { false }
 }

@@ -47,7 +47,7 @@ public class Checkbox: View {
         }
     }
 
-    public func handle(event: KeyEvent) -> Bool {
+    public override func handle(event: KeyEvent) -> Bool {
         switch event.keyCode {
         case .char(" "), .enter:
             toggle()
