@@ -2,6 +2,7 @@
 .build/
 .swiftpm/
 Packages/
+capture/
 
 # Xcode (if you open the package in Xcode)
 DerivedData/

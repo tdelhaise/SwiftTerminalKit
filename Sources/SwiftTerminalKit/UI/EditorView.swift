@@ -103,7 +103,8 @@ public final class EditorView: View {
 	    public override func handle(event: KeyEvent) -> Bool {		let mods = event.mods
 		switch event.keyCode {
 			case .char(let ch):
-				if mods.contains(.ctrl) || mods.contains(.meta) { return false }
+				// Alt/Ctrl/Meta combos are handled by the application (menus, shortcuts)
+				if mods.contains(.ctrl) || mods.contains(.meta) || mods.contains(.alt) { return false }
 				if ch == "\n" || ch == "\r" { newline(); return true }
 				if ch == "\u{8}" || ch == "\u{7F}" { backspace(); return true }
 				if ch.isNewline { newline(); return true }

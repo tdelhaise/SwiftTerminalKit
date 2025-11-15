@@ -18,10 +18,10 @@ struct TVEditTheme {
         editorForeground: .named(.brightWhite),
         editorBackground: .named(.blue),
         editorBorder: .named(.brightWhite),
-        menuForeground: .named(.white),
-        menuBackground: .named(.cyan),
+        menuForeground: .named(.black),
+        menuBackground: .named(.white),
         menuHighlightForeground: .named(.black),
-        menuHighlightBackground: .named(.brightWhite),
+        menuHighlightBackground: .named(.green),
         statusForeground: .named(.black),
         statusBackground: .gray(level: 20)
     )
